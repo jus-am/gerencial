@@ -100,6 +100,51 @@
             color: var(--text-muted);
         }
 
+        .unit-heading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+        }
+
+        .header .unit-name { font-weight: 600; }
+        .header .forum-details { margin-top: 0.4rem; }
+        .header .forum-details p { font-size: 0.8rem; overflow-wrap: anywhere; }
+        .forum-contacts a { color: var(--primary-color); }
+
+        .header-edit, .header-editor button {
+            font: inherit;
+            cursor: pointer;
+            border: 1px solid currentColor;
+            border-radius: 0.5rem;
+            background: var(--card-bg);
+            color: var(--primary-color);
+            padding: 0.4rem 0.65rem;
+        }
+
+        .header-editor {
+            width: min(30rem, calc(100% - 2rem));
+            max-height: calc(100% - 2rem);
+            margin: auto;
+            padding: 1.25rem;
+            border: 0;
+            border-radius: var(--radius);
+            color: var(--text-main);
+            background: var(--card-bg);
+        }
+
+        .header-editor::backdrop { background: rgb(15 23 42 / 55%); }
+        .header-editor form, .header-editor label { display: grid; gap: 0.4rem; }
+        .header-editor form { gap: 0.75rem; }
+        .header-editor input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #94a3b8;
+            border-radius: 0.4rem;
+            font: inherit;
+        }
+        .header-editor-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
         /* ==========================================================================
            Seções e Grid
            ========================================================================== */
@@ -268,8 +313,38 @@
     <header class="header">
         <img src="logo.png" alt="TJAM" class="logo-header" onerror="this.style.display='none'">
         <h1>CENTRAL DE GESTÃO</h1>
-        <p>7ª Vara Criminal da Comarca de Manaus - TJAM</p>
+        <div class="unit-heading">
+            <p class="unit-name" id="unit-name">Vara Única da Comarca de Benjamin Constant</p>
+            <button class="header-edit" id="edit-unit" type="button" aria-label="Editar dados da unidade" title="Editar dados da unidade">
+                <i class="fas fa-pen" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="forum-details">
+            <p id="forum-name">Fórum Azarias Menescal de Vasconcelos</p>
+            <p id="forum-address">Avenida Castelo Branco, 469 – Centro, Benjamin Constant – AM</p>
+            <p class="forum-contacts" id="forum-contacts">
+                <a id="forum-phone" href="tel:+559221296809">(92) 2129-6809</a>
+                <span id="forum-contact-separator" aria-hidden="true"> · </span>
+                <a id="forum-email" href="mailto:comarca.bconstant@tjam.jus.br">comarca.bconstant@tjam.jus.br</a>
+            </p>
+        </div>
     </header>
+
+    <dialog class="header-editor" id="unit-editor" aria-labelledby="unit-editor-title">
+        <form id="unit-form">
+            <h2 id="unit-editor-title">Editar dados da unidade</h2>
+            <label>Nome da unidade<input name="unit-name" maxlength="160" required autofocus></label>
+            <label>Nome do fórum<input name="forum-name" maxlength="160"></label>
+            <label>Endereço<input name="forum-address" maxlength="240"></label>
+            <label>Telefone<input name="forum-phone" type="tel" maxlength="40"></label>
+            <label>E-mail<input name="forum-email" type="email" maxlength="160"></label>
+            <p role="alert" id="unit-editor-error" hidden></p>
+            <div class="header-editor-actions">
+                <button id="cancel-unit-edit" type="button">Cancelar</button>
+                <button type="submit">Salvar</button>
+            </div>
+        </form>
+    </dialog>
 
     <!-- Barra de Acesso Rápido -->
     <nav class="quick-access-container">
@@ -376,7 +451,80 @@
             container.innerHTML = htmlContent;
         }
 
+        function initUnitEditor() {
+            const storageKey = 'gerencial.unit-header.v1';
+            const dialog = document.getElementById('unit-editor');
+            const form = document.getElementById('unit-form');
+            const error = document.getElementById('unit-editor-error');
+            const fields = Object.fromEntries(
+                Array.from(form.elements).filter(input => input.name)
+                    .map(input => [input.name, document.getElementById(input.name)])
+            );
+            const defaults = Object.fromEntries(
+                Object.entries(fields).map(([name, element]) => [name, element.textContent.trim()])
+            );
+
+            function renderDetails(details) {
+                for (const [name, element] of Object.entries(fields)) {
+                    const value = typeof details[name] === 'string' ? details[name].trim() : defaults[name];
+                    element.textContent = name === 'unit-name' ? value || defaults[name] : value;
+                    element.hidden = name !== 'unit-name' && !value;
+                }
+
+                const phone = fields['forum-phone'];
+                const email = fields['forum-email'];
+                const digits = phone.textContent.replace(/\D/g, '');
+                if (digits) {
+                    phone.href = `tel:+${digits.length === 10 || digits.length === 11 ? '55' : ''}${digits}`;
+                } else {
+                    phone.removeAttribute('href');
+                }
+                if (email.textContent) email.href = `mailto:${encodeURIComponent(email.textContent).replace('%40', '@')}`;
+                else email.removeAttribute('href');
+                document.getElementById('forum-contact-separator').hidden = phone.hidden || email.hidden;
+                document.getElementById('forum-contacts').hidden = phone.hidden && email.hidden;
+            }
+
+            try {
+                renderDetails(JSON.parse(localStorage.getItem(storageKey)) || defaults);
+            } catch {
+                renderDetails(defaults);
+            }
+
+            document.getElementById('edit-unit').addEventListener('click', () => {
+                for (const [name, element] of Object.entries(fields)) {
+                    form.elements.namedItem(name).value = element.textContent;
+                }
+                error.hidden = true;
+                dialog.showModal();
+            });
+            document.getElementById('cancel-unit-edit').addEventListener('click', () => dialog.close());
+
+            form.addEventListener('submit', event => {
+                event.preventDefault();
+                const details = Object.fromEntries(
+                    Array.from(new FormData(form), ([name, value]) => [name, value.trim()])
+                );
+                if (!details['unit-name']) {
+                    error.textContent = 'Informe o nome da unidade.';
+                    error.hidden = false;
+                    form.elements.namedItem('unit-name').focus();
+                    return;
+                }
+                try {
+                    localStorage.setItem(storageKey, JSON.stringify(details));
+                } catch {
+                    error.textContent = 'O navegador não permitiu salvar os dados.';
+                    error.hidden = false;
+                    return;
+                }
+                renderDetails(details);
+                dialog.close();
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', renderDashboard);
+        document.addEventListener('DOMContentLoaded', initUnitEditor);
     </script>
 </body>
 </html>
