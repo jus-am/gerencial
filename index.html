@@ -67,6 +67,7 @@
            Cabeçalho Institucional (Layout Clean e Compacto)
            ========================================================================== */
         .header {
+            position: relative;
             background: var(--card-bg);
             color: var(--text-main);
             padding: 1.5rem 2rem;
@@ -112,7 +113,29 @@
         .header .forum-details p { font-size: 0.8rem; overflow-wrap: anywhere; }
         .forum-contacts a { color: var(--primary-color); }
 
-        .header-edit, .header-editor button {
+        .header-edit {
+            position: absolute;
+            top: 0.4rem;
+            right: 0.4rem;
+            display: grid;
+            place-items: center;
+            width: 2rem;
+            height: 2rem;
+            padding: 0;
+            border: 0;
+            border-radius: 0.4rem;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .header-edit:hover, .header-edit:focus-visible {
+            background: #eef2f7;
+            color: var(--primary-color);
+        }
+
+        .header-editor button {
             font: inherit;
             cursor: pointer;
             border: 1px solid currentColor;
