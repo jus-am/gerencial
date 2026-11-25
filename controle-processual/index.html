@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle Processual - 7ª Vara Criminal</title>
+    <title>Controle Processual - Vara Única de Benjamin Constant/AM</title>
     <link rel="icon" type="image/png" href="../logo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -131,7 +131,7 @@
     <div style="background:#ffffff;border-radius:12px;width:100%;max-width:380px;padding:2rem 1.75rem;box-shadow:0 10px 15px -3px rgba(0,0,0,0.2);">
         <div style="text-align:center;margin-bottom:1.5rem;">
             <img src="../logo.png" alt="TJAM" style="max-height:48px;margin-bottom:0.75rem;" onerror="this.style.display='none'">
-            <h1 style="font-size:1.2rem;font-weight:700;color:#1a2a6c;"><i class="fas fa-scale-balanced"></i> Controle Processual · 7ª Vara Criminal</h1>
+            <h1 style="font-size:1.2rem;font-weight:700;color:#1a2a6c;"><i class="fas fa-scale-balanced"></i> Controle Processual · Vara Única de Benjamin Constant/AM</h1>
             <p style="font-size:0.82rem;color:#718096;margin-top:0.25rem;">Faça login para continuar</p>
         </div>
         <div id="auth-error" style="display:none;background:#fdecea;color:#e74c3c;border-radius:8px;padding:0.6rem 0.9rem;font-size:0.82rem;font-weight:600;margin-bottom:1rem;"></div>
@@ -157,7 +157,7 @@
         <img src="../logo.png" alt="TJAM" class="logo-header" onerror="this.style.display='none'">
         <div>
             <h1><i class="fas fa-scale-balanced"></i> Controle Processual</h1>
-            <p>7ª Vara Criminal da Comarca de Manaus · TJAM</p>
+            <p>Vara Única da Comarca de Benjamin Constant/AM · TJAM</p>
         </div>
     </div>
     <div class="header-actions">
@@ -375,20 +375,18 @@
 
 </div><!-- /app-content -->
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../seguranca/config.local.js"></script>
+<script src="../seguranca/cliente-homologacao.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 <script>
 // ─── DATA LAYER (Supabase) ────────────────────────────────────────────────
-const SUPABASE_URL = 'https://qcvietuczbysditpkopr.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjdmlldHVjemJ5c2RpdHBrb3ByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjkzMjIsImV4cCI6MjA5NzIwNTMyMn0.HcQ5AAwaM9WP9MAm3KSO5LtJKhUzTIRkpaIGeW2n_os';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {auth:{storageKey:'controle-bc-auth-v2'}});
+const sb = window.criarClienteHomologacao('controle-bc-auth-v2');
 
 const STORAGE_IDOSOS = 'controleProcessual_idosos_v1';
 const STORAGE_CARTAS = 'controleProcessual_cartas_v1';
 
 let idosos = [];
 let cartas = [];
-let nextIdosoId = 1;
-let nextCartaId = 1;
 let currentModule = 'idosos';
 let piSort = { field: 'tramitacao', dir: 'desc' };
 let cpSort = { field: 'tramitacao', dir: 'desc' };
@@ -432,25 +430,30 @@ async function authSignOut() { const {error} = await sb.auth.signOut({scope:'loc
 
 let activeSessionUser = null;
 sb.auth.onAuthStateChange((event, session) => {
+    const overlay = document.getElementById('auth-overlay');
+    const appContent = document.getElementById('app-content');
     if (activeSessionUser && (!session || session.user.id !== activeSessionUser)) {
-        document.getElementById('app-content').style.display = 'none';
+        activeSessionUser = null;
+        appContent.style.display = 'none';
         window.location.reload();
         return;
     }
-    if (session) activeSessionUser = session.user.id;
-    const overlay = document.getElementById('auth-overlay');
-    const appContent = document.getElementById('app-content');
-    if (session) {
-        overlay.style.display = 'none';
-        appContent.style.display = '';
-        if (!window.__appInitialized) {
-            window.__appInitialized = true;
-            initApp();
+    if (!session || activeSessionUser) return;
+    activeSessionUser = session.user.id;
+    setTimeout(async () => {
+        try {
+            await window.exigirLeituraAplicativo(sb, session.user.id, 'controle_processual');
+            if (activeSessionUser !== session.user.id) return;
+            if (!await initApp(session.user.id)) return;
+            if (activeSessionUser !== session.user.id) return;
+            overlay.style.display = 'none';
+            appContent.style.display = '';
+        } catch {
+            showAuthError('Acesso indisponível para esta conta.');
+            activeSessionUser = null;
+            await authSignOut();
         }
-    } else {
-        overlay.style.display = 'flex';
-        appContent.style.display = 'none';
-    }
+    }, 0);
 });
 
 // ─── MAPEAMENTO SUPABASE ────────────────────────────────────────────────────
@@ -487,29 +490,26 @@ function rowToCarta(r) {
 }
 
 // ─── INIT / SYNC ─────────────────────────────────────────────────────────
-async function initApp() {
+async function initApp(userId) {
     try {
-        const [{ data: piRows, error: e1 }, { data: cpRows, error: e2 }] = await Promise.all([
-            sb.from('processos_idosos').select('*'),
-            sb.from('cartas_precatorias').select('*'),
+        const [piRows, cpRows] = await Promise.all([
+            window.lerTabelaPaginada(sb, 'processos_idosos'),
+            window.lerTabelaPaginada(sb, 'cartas_precatorias'),
         ]);
-        if (e1) throw e1;
-        if (e2) throw e2;
         idosos = (piRows || []).map(rowToIdoso);
         cartas = (cpRows || []).map(rowToCarta);
         
         
     } catch (e) {
-        console.error('Falha ao carregar dados', e);
         idosos = []; cartas = [];
-        showToast('Não foi possível carregar os dados. Recarregue a página.', 'error');
-        return;
+        showAuthError('Não foi possível carregar os dados. Recarregue a página.');
+        return false;
     }
-    nextIdosoId = idosos.length ? Math.max(...idosos.map(p => p.id)) + 1 : 1;
-    nextCartaId = cartas.length ? Math.max(...cartas.map(c => c.id)) + 1 : 1;
     renderIdosos();
     renderCartas();
+    if (activeSessionUser !== userId) return false;
     subscribeRealtime();
+    return true;
 }
 
 function subscribeRealtime() {
@@ -536,25 +536,55 @@ function handleRealtime(list, payload, mapFn, afterFn) {
     afterFn();
 }
 
-async function persistIdoso(p) {
-    
-    try { await sb.from('processos_idosos').upsert(idosoToRow(p)); }
-    catch (e) { console.error('Supabase save error', e); showToast('Erro ao sincronizar', 'error'); }
+async function confirmChange(query, id) {
+    try {
+        const { data, error } = await query.select('id').single();
+        if (!error && data?.id === id) return true;
+    } catch {
+        // A request interrupted in transit can also leave the result unknown.
+    }
+    showToast('Não foi possível confirmar a operação. Confira o registro antes de tentar novamente.', 'error');
+    return false;
 }
-async function persistCarta(c) {
-    
-    try { await sb.from('cartas_precatorias').upsert(cartaToRow(c)); }
-    catch (e) { console.error('Supabase save error', e); showToast('Erro ao sincronizar', 'error'); }
+
+function persistRecord(table, row, editing) {
+    const { id, ...fields } = row;
+    const records = sb.from(table);
+    const query = editing ? records.update(fields).eq('id', id) : records.insert(row);
+    return confirmChange(query, id);
 }
-async function removeIdoso(id) {
-    
-    try { await sb.from('processos_idosos').delete().eq('id', id); }
-    catch (e) { console.error('Supabase delete error', e); }
+
+function persistIdoso(p, editing) {
+    return persistRecord('processos_idosos', idosoToRow(p), editing);
 }
-async function removeCarta(id) {
-    
-    try { await sb.from('cartas_precatorias').delete().eq('id', id); }
-    catch (e) { console.error('Supabase delete error', e); }
+function persistCarta(c, editing) {
+    return persistRecord('cartas_precatorias', cartaToRow(c), editing);
+}
+function removeIdoso(id) {
+    return confirmChange(sb.from('processos_idosos').delete().eq('id', id), id);
+}
+function removeCarta(id) {
+    return confirmChange(sb.from('cartas_precatorias').delete().eq('id', id), id);
+}
+
+function newRecordId(field) {
+    if (!field.dataset.newId) {
+        const [high, low] = crypto.getRandomValues(new Uint32Array(2));
+        field.dataset.newId = String((high & 0xfffff) * 2 ** 32 + low + 2 ** 52);
+    }
+    return Number(field.dataset.newId);
+}
+
+const pendingChanges = new Set();
+
+async function runChange(app, action) {
+    if (pendingChanges.has(app)) return;
+    pendingChanges.add(app);
+    try {
+        await action();
+    } finally {
+        pendingChanges.delete(app);
+    }
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────
@@ -678,6 +708,8 @@ document.addEventListener('input', e => { if (e.target.id === 'pi-search') rende
 document.addEventListener('change', e => { if (e.target.id === 'pi-filter-fase' || e.target.id === 'pi-filter-julgado') renderIdosos(); });
 
 function openModalIdoso(id) {
+    if (pendingChanges.has('pi')) return;
+    delete document.getElementById('pi-id').dataset.newId;
     const p = id ? idosos.find(x => x.id === id) : null;
     document.getElementById('pi-id').value = p ? p.id : '';
     document.getElementById('pi-processo').value = p ? p.processo : '';
@@ -696,38 +728,42 @@ function openModalIdoso(id) {
 }
 function closeModalIdoso() { document.getElementById('modal-idoso').classList.remove('open'); }
 async function saveIdoso() {
-    const processo = document.getElementById('pi-processo').value.trim();
-    if (!processo) { showToast('Informe o número do processo', 'error'); return; }
-    const idVal = document.getElementById('pi-id').value;
-    const id = idVal ? Number(idVal) : nextIdosoId++;
-    const p = {
-        id, processo,
-        dataDistribuicao: document.getElementById('pi-data-distribuicao').value || null,
-        denuncia: document.getElementById('pi-denuncia').value || null,
-        faseProcessual: document.getElementById('pi-fase').value.trim(),
-        localizacao: document.getElementById('pi-localizacao').value.trim(),
-        mpOrigem: document.getElementById('pi-mp').value.trim(),
-        defesa: document.getElementById('pi-defesa').value.trim(),
-        primeiraSentenca: document.getElementById('pi-sentenca').checked,
-        julgado: document.getElementById('pi-julgado').checked,
-        pendencias: document.getElementById('pi-pendencias').value.trim(),
-    };
-    const idx = idosos.findIndex(x => x.id === id);
-    if (idx >= 0) idosos[idx] = p; else idosos.push(p);
-    closeModalIdoso();
-    renderIdosos();
-    await persistIdoso(p);
-    showToast('Processo salvo com sucesso');
+    await runChange('pi', async () => {
+        const processo = document.getElementById('pi-processo').value.trim();
+        if (!processo) { showToast('Informe o número do processo', 'error'); return; }
+        const idVal = document.getElementById('pi-id').value;
+        const id = idVal ? Number(idVal) : newRecordId(document.getElementById('pi-id'));
+        const p = {
+            id, processo,
+            dataDistribuicao: document.getElementById('pi-data-distribuicao').value || null,
+            denuncia: document.getElementById('pi-denuncia').value || null,
+            faseProcessual: document.getElementById('pi-fase').value.trim(),
+            localizacao: document.getElementById('pi-localizacao').value.trim(),
+            mpOrigem: document.getElementById('pi-mp').value.trim(),
+            defesa: document.getElementById('pi-defesa').value.trim(),
+            primeiraSentenca: document.getElementById('pi-sentenca').checked,
+            julgado: document.getElementById('pi-julgado').checked,
+            pendencias: document.getElementById('pi-pendencias').value.trim(),
+        };
+        if (!await persistIdoso(p, Boolean(idVal))) return;
+        const idx = idosos.findIndex(x => x.id === id);
+        if (idx >= 0) idosos[idx] = p; else idosos.push(p);
+        closeModalIdoso();
+        renderIdosos();
+        showToast('Processo salvo com sucesso');
+    });
 }
 async function deleteIdoso() {
-    const id = Number(document.getElementById('pi-id').value);
-    if (!id) return;
-    if (!confirm('Excluir este processo do controle?')) return;
-    idosos = idosos.filter(x => x.id !== id);
-    closeModalIdoso();
-    renderIdosos();
-    await removeIdoso(id);
-    showToast('Processo excluído');
+    await runChange('pi', async () => {
+        const id = Number(document.getElementById('pi-id').value);
+        if (!id) return;
+        if (!confirm('Excluir este processo do controle?')) return;
+        if (!await removeIdoso(id)) return;
+        idosos = idosos.filter(x => x.id !== id);
+        closeModalIdoso();
+        renderIdosos();
+        showToast('Processo excluído');
+    });
 }
 
 // ═══════════════════════════ CARTAS PRECATÓRIAS ═══════════════════════════
@@ -811,6 +847,8 @@ function addRespRow(value) {
     list.appendChild(row);
 }
 function openModalCarta(id) {
+    if (pendingChanges.has('cp')) return;
+    delete document.getElementById('cp-id').dataset.newId;
     const c = id ? cartas.find(x => x.id === id) : null;
     document.getElementById('cp-id').value = c ? c.id : '';
     document.getElementById('cp-processo').value = c ? c.processo : '';
@@ -830,38 +868,42 @@ function openModalCarta(id) {
 }
 function closeModalCarta() { document.getElementById('modal-carta').classList.remove('open'); }
 async function saveCarta() {
-    const processo = document.getElementById('cp-processo').value.trim();
-    if (!processo) { showToast('Informe o número do processo', 'error'); return; }
-    const idVal = document.getElementById('cp-id').value;
-    const id = idVal ? Number(idVal) : nextCartaId++;
-    const responsaveis = Array.from(document.querySelectorAll('#cp-resp-list input'))
-        .map(i => i.value.trim()).filter(Boolean);
-    const c = {
-        id, processo,
-        recebimento: document.getElementById('cp-recebimento').value || null,
-        finalidade: document.getElementById('cp-finalidade').value.trim(),
-        localizador: document.getElementById('cp-localizador').value.trim(),
-        primeiraSentenca: document.getElementById('cp-sentenca').checked,
-        prioridade: document.getElementById('cp-prioridade').checked,
-        responsaveis,
-        pendencias: document.getElementById('cp-pendencias').value.trim(),
-    };
-    const idx = cartas.findIndex(x => x.id === id);
-    if (idx >= 0) cartas[idx] = c; else cartas.push(c);
-    closeModalCarta();
-    renderCartas();
-    await persistCarta(c);
-    showToast('Carta precatória salva com sucesso');
+    await runChange('cp', async () => {
+        const processo = document.getElementById('cp-processo').value.trim();
+        if (!processo) { showToast('Informe o número do processo', 'error'); return; }
+        const idVal = document.getElementById('cp-id').value;
+        const id = idVal ? Number(idVal) : newRecordId(document.getElementById('cp-id'));
+        const responsaveis = Array.from(document.querySelectorAll('#cp-resp-list input'))
+            .map(i => i.value.trim()).filter(Boolean);
+        const c = {
+            id, processo,
+            recebimento: document.getElementById('cp-recebimento').value || null,
+            finalidade: document.getElementById('cp-finalidade').value.trim(),
+            localizador: document.getElementById('cp-localizador').value.trim(),
+            primeiraSentenca: document.getElementById('cp-sentenca').checked,
+            prioridade: document.getElementById('cp-prioridade').checked,
+            responsaveis,
+            pendencias: document.getElementById('cp-pendencias').value.trim(),
+        };
+        if (!await persistCarta(c, Boolean(idVal))) return;
+        const idx = cartas.findIndex(x => x.id === id);
+        if (idx >= 0) cartas[idx] = c; else cartas.push(c);
+        closeModalCarta();
+        renderCartas();
+        showToast('Carta precatória salva com sucesso');
+    });
 }
 async function deleteCarta() {
-    const id = Number(document.getElementById('cp-id').value);
-    if (!id) return;
-    if (!confirm('Excluir esta carta precatória do controle?')) return;
-    cartas = cartas.filter(x => x.id !== id);
-    closeModalCarta();
-    renderCartas();
-    await removeCarta(id);
-    showToast('Carta precatória excluída');
+    await runChange('cp', async () => {
+        const id = Number(document.getElementById('cp-id').value);
+        if (!id) return;
+        if (!confirm('Excluir esta carta precatória do controle?')) return;
+        if (!await removeCarta(id)) return;
+        cartas = cartas.filter(x => x.id !== id);
+        closeModalCarta();
+        renderCartas();
+        showToast('Carta precatória excluída');
+    });
 }
 </script>
 </body>

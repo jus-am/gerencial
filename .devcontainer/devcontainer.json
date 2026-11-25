@@ -1,0 +1,14 @@
+{
+  "name": "Gerencial 2.0 · homologação isolada",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "hostRequirements": {"cpus": 2, "memory": "8gb"},
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {"label": "Gerencial · homologação", "onAutoForward": "silent"}
+  },
+  "otherPortsAttributes": {"onAutoForward": "ignore"},
+  "postStartCommand": "bash seguranca/iniciar-codespace.sh"
+}

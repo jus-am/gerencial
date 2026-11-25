@@ -1,0 +1,17 @@
+project_id = "gerencial-2-homologacao-local"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[auth]
+site_url = "http://127.0.0.1:8080"
+additional_redirect_urls = ["http://127.0.0.1:8080/"]
+enable_signup = false
+enable_anonymous_sign_ins = false

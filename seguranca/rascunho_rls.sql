@@ -1,15 +1,18 @@
 -- PROPOSTA NÃO EXECUTADA. Aplicar somente após backup, classificação e homologação.
 begin;
 create table public.perfis_usuarios (
- user_id uuid primary key references auth.users(id) on delete cascade,
+ user_id uuid references auth.users(id) on delete cascade,
+ aplicativo text not null check(aplicativo in ('audiencias','controle_processual','tempo_apn')),
  nome text not null, perfil text not null check(perfil in ('administrador','servidor','consulta')),
- ativo boolean not null default false
+ ativo boolean not null default false,
+ primary key(user_id, aplicativo)
 );
 create table public.permissoes_usuarios (
- user_id uuid references public.perfis_usuarios(user_id) on delete cascade,
+ user_id uuid not null,
  aplicativo text not null check(aplicativo in ('audiencias','controle_processual','tempo_apn')),
  operacao text not null check(operacao in ('select','insert','update','delete')),
- primary key(user_id,aplicativo,operacao)
+ primary key(user_id,aplicativo,operacao),
+ foreign key(user_id,aplicativo) references public.perfis_usuarios(user_id,aplicativo) on delete cascade
 );
 alter table public.perfis_usuarios enable row level security;
 alter table public.permissoes_usuarios enable row level security;
@@ -25,7 +28,8 @@ revoke all on schema gerencial_privado from public,anon,authenticated;
 grant usage on schema gerencial_privado to authenticated;
 create function gerencial_privado.autorizado(app text,op text) returns boolean
 language sql stable security invoker set search_path='' as $$
-select exists(select 1 from public.perfis_usuarios p where p.user_id=(select auth.uid()) and p.ativo and
+select exists(select 1 from public.perfis_usuarios p where p.user_id=(select auth.uid()) and p.aplicativo=app and p.ativo
+ and coalesce((select auth.jwt()) ->> 'is_anonymous', 'false') = 'false' and
 (((p.perfil in ('administrador','servidor') or (p.perfil='consulta' and op='select')) and exists(select 1 from public.permissoes_usuarios a where a.user_id=p.user_id and a.aplicativo=app and a.operacao=op))))
 $$;
 revoke all on function gerencial_privado.autorizado(text,text) from public,anon,authenticated;
@@ -33,14 +37,24 @@ grant execute on function gerencial_privado.autorizado(text,text) to authenticat
 -- Segunda etapa: somente após saneamento confirmado. Não executar isoladamente.
 -- Políticas antigas são substituídas atomicamente; nenhum dado é apagado.
 do $$
-declare t text; app text; op text;
+declare t text; app text; op text; politica text; sequencia text;
 begin
 foreach t in array array['audiencias','magistrados','promotores','salas','processos_idosos','cartas_precatorias','tempo_apn'] loop
 app:=case when t in ('audiencias','magistrados','promotores','salas') then 'audiencias' when t='tempo_apn' then 'tempo_apn' else 'controle_processual' end;
-execute format('drop policy if exists %I on public.%I','authenticated access',t);
-execute format('drop policy if exists %I on public.%I','Autenticados podem tudo',t);
+execute format('alter table public.%I enable row level security',t);
+for politica in select policyname from pg_catalog.pg_policies where schemaname='public' and tablename=t loop
+execute format('drop policy %I on public.%I',politica,t);
+end loop;
 execute format('revoke all on public.%I from public,anon,authenticated',t);
 execute format('grant select,insert,update,delete on public.%I to authenticated',t);
+if exists(select 1 from information_schema.columns
+          where table_schema='public' and table_name=t and column_name='id') then
+sequencia:=pg_get_serial_sequence(format('public.%I',t),'id');
+if sequencia is not null then
+execute format('revoke all on sequence %s from public,anon,authenticated',sequencia);
+execute format('grant usage on sequence %s to authenticated',sequencia);
+end if;
+end if;
 foreach op in array array['select','insert','update','delete'] loop
 execute format('create policy %I on public.%I for %s to authenticated %s', 'gerencial_'||op,t,op,
 case when op='insert' then format('with check (gerencial_privado.autorizado(%L,%L))',app,op)

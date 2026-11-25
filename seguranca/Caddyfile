@@ -1,0 +1,23 @@
+{
+    admin off
+    auto_https off
+}
+
+:8080 {
+    bind 127.0.0.1
+    header Cache-Control "no-store"
+
+    @bloqueado path /auth/v1/admin /auth/v1/admin/* /auth/v1/signup /auth/v1/invite
+    respond @bloqueado 403
+
+    @api path /auth/v1/* /rest/v1/* /realtime/v1/*
+    reverse_proxy @api 127.0.0.1:54321 {
+        header_up -Cookie
+        header_up Host 127.0.0.1:54321
+    }
+
+    reverse_proxy 127.0.0.1:8081 {
+        header_up -Cookie
+        header_up Host 127.0.0.1:8081
+    }
+}

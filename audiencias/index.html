@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>Audiências - 7ª Vara Criminal</title>
+    <title>Audiências - Vara Única de Benjamin Constant/AM</title>
     <link rel="icon" type="image/png" href="../logo.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -396,8 +396,11 @@
             .header h1 { font-size: 0.9rem; }
             .view-btn { font-size: 0.75rem; padding: 0.35rem 0.6rem; }
         }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    .cadastro-inline-input { flex:1; padding:2px 6px; border:1px solid var(--primary); border-radius:4px; font-size:0.9rem; }
+</style>
+    <script src="../seguranca/config.local.js"></script>
+<script src="../seguranca/cliente-homologacao.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -406,7 +409,7 @@
     <div style="background:#ffffff;border-radius:12px;width:100%;max-width:380px;padding:2rem 1.75rem;box-shadow:0 10px 15px -3px rgba(0,0,0,0.2);">
         <div style="text-align:center;margin-bottom:1.5rem;">
             <img src="../logo.png" alt="TJAM" style="max-height:48px;margin-bottom:0.75rem;" onerror="this.style.display='none'">
-            <h1 style="font-size:1.2rem;font-weight:700;color:#1a2a6c;"><i class="fas fa-gavel"></i> Audiências · 7ª Vara Criminal</h1>
+            <h1 style="font-size:1.2rem;font-weight:700;color:#1a2a6c;"><i class="fas fa-gavel"></i> Audiências · Vara Única de Benjamin Constant/AM</h1>
             <p style="font-size:0.82rem;color:#718096;margin-top:0.25rem;">Faça login para continuar</p>
         </div>
         <div id="auth-error" style="display:none;background:#fdecea;color:#e74c3c;border-radius:8px;padding:0.6rem 0.9rem;font-size:0.82rem;font-weight:600;margin-bottom:1rem;"></div>
@@ -432,7 +435,7 @@
         <img src="../logo.png" alt="TJAM" class="logo-header" onerror="this.style.display='none'">
         <div>
             <h1 id="header-title"><i class="fas fa-calendar-days"></i> Audiências</h1>
-            <p>7ª Vara Criminal da Comarca de Manaus · TJAM</p>
+            <p>Vara Única da Comarca de Benjamin Constant/AM · TJAM</p>
             <p id="header-welcome" style="display:none;font-weight:600;color:var(--primary);"></p>
         </div>
     </div>
@@ -987,15 +990,13 @@ let activeCard   = 'previstas';
 let searchTerm   = '';
 let sortField    = 'data';
 let sortDir      = 1;
-let nextId       = 500;
+
 let chartInstances = {};
 let cadastroSection = 'magistrados';
 
 // ─── DATA LAYER (Supabase) ────────────────────────────────────────────────────
 
-const SUPABASE_URL = 'https://qcvietuczbysditpkopr.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjdmlldHVjemJ5c2RpdHBrb3ByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjkzMjIsImV4cCI6MjA5NzIwNTMyMn0.HcQ5AAwaM9WP9MAm3KSO5LtJKhUzTIRkpaIGeW2n_os';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {auth:{storageKey:'agenda-bc-auth-v2'}});
+const sb = window.criarClienteHomologacao('agenda-bc-auth-v2');
 
 // ─── AUTH ──────────────────────────────────────────────────────────────────
 
@@ -1041,29 +1042,44 @@ async function authSignOut() {
 
 let activeSessionUser = null;
 sb.auth.onAuthStateChange((event, session) => {
+    const overlay = document.getElementById('auth-overlay');
+    const appContent = document.getElementById('app-content');
     if (activeSessionUser && (!session || session.user.id !== activeSessionUser)) {
-        document.getElementById('app-content').style.display = 'none';
+        activeSessionUser = null;
+        appContent.style.display = 'none';
         window.location.reload();
         return;
     }
-    if (session) activeSessionUser = session.user.id;
-    const overlay = document.getElementById('auth-overlay');
-    const appContent = document.getElementById('app-content');
-    if (session) {
-        overlay.style.display = 'none';
-        appContent.style.display = '';
-        atualizarAvatarHeader(session.user);
-        if (!window.__appInitialized) {
-            window.__appInitialized = true;
-            initApp();
+    if (!session || activeSessionUser) return;
+    activeSessionUser = session.user.id;
+    setTimeout(async () => {
+        try {
+            await window.exigirLeituraAplicativo(sb, session.user.id, 'audiencias');
+            if (activeSessionUser !== session.user.id) return;
+            if (!await initApp(session.user.id)) return;
+            if (activeSessionUser !== session.user.id) return;
+            atualizarAvatarHeader(session.user);
+            overlay.style.display = 'none';
+            appContent.style.display = '';
+        } catch {
+            showAuthError('Acesso indisponível para esta conta.');
+            activeSessionUser = null;
+            await authSignOut();
         }
-    } else {
-        overlay.style.display = 'flex';
-        appContent.style.display = 'none';
-    }
+    }, 0);
 });
 
 // ─── PERFIL ────────────────────────────────────────────────────────────────
+
+function renderAvatar(element, value, fallback) {
+    element.textContent = fallback;
+    if (typeof value !== 'string' || !/^data:image\/(png|jpeg|webp|gif);base64,[a-z0-9+/=]+$/i.test(value)) return;
+    const image = document.createElement('img');
+    image.src = value;
+    image.alt = '';
+    image.style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover';
+    element.replaceChildren(image);
+}
 
 function atualizarAvatarHeader(user) {
     if (!user) return;
@@ -1072,7 +1088,7 @@ function atualizarAvatarHeader(user) {
     const cargo = user.user_metadata && user.user_metadata.cargo;
     const inicial = (user.email || '?').charAt(0).toUpperCase();
     const headerAvatar = document.getElementById('header-avatar');
-    headerAvatar.innerHTML = avatarUrl ? `<img src="${avatarUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : inicial;
+    renderAvatar(headerAvatar, avatarUrl, inicial);
     const nameEl = document.getElementById('header-profile-name');
     if (nameEl) nameEl.textContent = nome || (user.email || 'Perfil').split('@')[0];
     const welcomeEl = document.getElementById('header-welcome');
@@ -1098,7 +1114,7 @@ async function openProfile() {
     document.getElementById('profile-data-msg').style.display = 'none';
     const avatarUrl = user.user_metadata && user.user_metadata.avatar_url;
     const inicial = (user.email || '?').charAt(0).toUpperCase();
-    document.getElementById('profile-avatar-lg').innerHTML = avatarUrl ? `<img src="${avatarUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : inicial;
+    renderAvatar(document.getElementById('profile-avatar-lg'), avatarUrl, inicial);
     document.getElementById('profile-modal').classList.add('open');
 }
 
@@ -1136,7 +1152,7 @@ function onProfilePhotoSelected(event) {
             const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
             const { data, error } = await sb.auth.updateUser({ data: { avatar_url: dataUrl } });
             if (error) { showToast('Erro ao salvar foto: ' + error.message); return; }
-            document.getElementById('profile-avatar-lg').innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+            renderAvatar(document.getElementById('profile-avatar-lg'), dataUrl, '?');
             atualizarAvatarHeader(data.user);
             showToast('Foto de perfil atualizada!');
         };
@@ -1216,38 +1232,37 @@ function fromSupabaseRow(r) {
     };
 }
 
-async function initApp() {
+async function initApp(userId) {
     try {
-        const { data: rows, error } = await sb.from('audiencias').select('*');
-        if (error) throw error;
+        const rows = await window.lerTabelaPaginada(sb, 'audiencias');
 
         audiencias = (rows || []).map(fromSupabaseRow);
         const { data: mags, error: magError } = await sb.from('magistrados').select('*').order('id');
         const { data: pros, error: proError } = await sb.from('promotores').select('*').order('id');
         if (magError || proError) throw magError || proError;
-        magistrados = (mags || []).map(m => ({nome: m.nome, ativo: m.ativo}));
-        promotores = (pros || []).map(p => ({nome: p.nome, ativo: p.ativo}));
+        magistrados = (mags || []).map(m => ({id: m.id, nome: m.nome, ativo: m.ativo}));
+        promotores = (pros || []).map(p => ({id: p.id, nome: p.nome, ativo: p.ativo}));
         const { data: salsData, error: salasError } = await sb.from('salas').select('*').order('id');
         if (salasError) throw salasError;
-        salas = (salsData || []).map(s => ({nome: s.nome, link: s.link, horas: s.horas || [], ativo: s.ativo !== false}));
+        salas = (salsData || []).map(s => ({id: s.id, nome: s.nome, link: s.link, horas: s.horas || [], ativo: s.ativo !== false}));
         
         
         
         
     } catch (e) {
-        console.error('Falha ao carregar dados', e);
         audiencias = []; magistrados = []; promotores = []; salas = [];
-        showToast('Não foi possível carregar os dados. Recarregue a página.', 'error');
-        return;
+        showAuthError('Não foi possível carregar os dados. Recarregue a página.');
+        return false;
     }
 
-    nextId = audiencias.length ? Math.max(...audiencias.map(a => a.id)) + 1 : 500;
 
     const initYears = getAvailableYears();
     currentAno = initYears.includes(2026) ? 2026 : (initYears[0] || 2026);
     render();
 
+    if (activeSessionUser !== userId) return false;
     subscribeRealtime();
+    return true;
 }
 
 function subscribeRealtime() {
@@ -1272,18 +1287,20 @@ function handleRealtimeAudiencia(payload) {
         if (idx >= 0) audiencias[idx] = updated; else audiencias.push(updated);
     }
     
-    nextId = audiencias.length ? Math.max(nextId, ...audiencias.map(a => a.id)) + 1 : nextId;
     if (currentView === 'agenda') render(); else if (currentView === 'relatorios') renderRelatorios();
 }
 
 async function reloadCadastros() {
     try {
-        const { data: mags } = await sb.from('magistrados').select('*').order('id');
-        const { data: pros } = await sb.from('promotores').select('*').order('id');
-        const { data: sals } = await sb.from('salas').select('*').order('id');
-        magistrados = (mags || []).map(m => ({nome: m.nome, ativo: m.ativo}));
-        promotores = (pros || []).map(p => ({nome: p.nome, ativo: p.ativo}));
-        salas = (sals || []).map(s => ({nome: s.nome, link: s.link, horas: s.horas || [], ativo: s.ativo !== false}));
+        const { data: mags, error: magsError } = await sb.from('magistrados').select('*').order('id');
+        if (magsError) throw magsError;
+        const { data: pros, error: prosError } = await sb.from('promotores').select('*').order('id');
+        if (prosError) throw prosError;
+        const { data: sals, error: salsError } = await sb.from('salas').select('*').order('id');
+        if (salsError) throw salsError;
+        magistrados = (mags || []).map(m => ({id: m.id, nome: m.nome, ativo: m.ativo}));
+        promotores = (pros || []).map(p => ({id: p.id, nome: p.nome, ativo: p.ativo}));
+        salas = (sals || []).map(s => ({id: s.id, nome: s.nome, link: s.link, horas: s.horas || [], ativo: s.ativo !== false}));
         sortSalas();
         
         
@@ -1293,34 +1310,93 @@ async function reloadCadastros() {
     } catch (e) { console.error('Supabase reloadCadastros error', e); }
 }
 
-async function saveData(rows) {
-    
+let savingAudiencias = false;
+let pendingBatch = null;
+
+async function confirmAudiencias(ids, write) {
+    if (savingAudiencias) return null;
+    savingAudiencias = true;
     try {
-        const { error } = await sb.from('audiencias').upsert((rows || audiencias).map(toSupabaseRow));
-        if (error) {
-            console.error('Supabase save error', error);
-            showToast('Erro ao salvar na nuvem: ' + error.message, 'error');
-            alert('NÃO FOI POSSÍVEL SALVAR NA NUVEM.\n\nMensagem técnica (envie esta mensagem para o suporte):\n' + (error.message || JSON.stringify(error)) + (error.code ? ('\nCódigo: ' + error.code) : '') + (error.hint ? ('\nDica: ' + error.hint) : ''));
+        const { data, error } = await write();
+        const expected = new Set(ids);
+        if (error || !data) throw new Error('Sem confirmação');
+        for (const row of data) expected.delete(row.id);
+        if (expected.size || data.length !== ids.length) {
+            showToast('O banco confirmou apenas parte da operação. Recarregue e confira os registros.', 'error');
         }
-    } catch (e) {
-        console.error('Supabase save error', e);
-        showToast('Erro ao salvar na nuvem: ' + e.message, 'error');
-        alert('NÃO FOI POSSÍVEL SALVAR NA NUVEM (falha de conexão).\n\nMensagem técnica (envie esta mensagem para o suporte):\n' + e.message);
+        return data;
+    } catch {
+        showToast('Não foi possível confirmar a operação. Confira os registros antes de tentar novamente.', 'error');
+        return null;
+    } finally {
+        savingAudiencias = false;
     }
 }
 
-async function saveCadastros() {
-    
-    
-    
+async function saveData(rows, { insert = false, fields } = {}) {
+    if (!rows.length) return false;
+    const ids = rows.map(row => row.id);
+    const data = await confirmAudiencias(ids, () => {
+        const table = sb.from('audiencias');
+        if (insert) return table.insert(rows.map(toSupabaseRow)).select();
+        if (fields) return table.update(fields).in('id', ids).select();
+
+        const [row] = rows;
+        const current = audiencias.find(a => a.id === row.id);
+        if (!current) throw new Error('Audiência indisponível');
+        const before = toSupabaseRow(current);
+        const after = toSupabaseRow(row);
+        const changes = Object.entries(after).filter(([field, value]) =>
+            field !== 'id' && JSON.stringify(value) !== JSON.stringify(before[field])
+        );
+        if (!changes.length) return Promise.resolve({data: [before], error: null});
+        let query = table.update(Object.fromEntries(changes)).eq('id', row.id);
+        for (const [field] of changes) {
+            const value = before[field];
+            if (value === null || value === undefined) query = query.is(field, null);
+            else query = query.eq(field, Array.isArray(value) ? JSON.stringify(value) : value);
+        }
+        return query.select();
+    });
+    if (!data) return false;
+    const updated = new Map(data.map(row => [row.id, fromSupabaseRow(row)]));
+    audiencias = audiencias.map(row => {
+        const saved = updated.get(row.id);
+        updated.delete(row.id);
+        return saved || row;
+    });
+    audiencias.push(...updated.values());
+    if (data.length !== ids.length) render();
+    return data.length === ids.length;
+}
+
+function novoIdAudiencia() {
+    const [high, low] = crypto.getRandomValues(new Uint32Array(2));
+    return (high & 0xfffff) * 2 ** 32 + low + 2 ** 52;
+}
+
+let savingCadastro = false;
+
+async function saveCadastro(table, fields, previous) {
+    if (savingCadastro) return false;
+    savingCadastro = true;
     try {
-        await sb.from('magistrados').delete().neq('id', -1);
-        if (magistrados.length) await sb.from('magistrados').insert(magistrados.map(m => ({nome: m.nome, ativo: m.ativo})));
-        await sb.from('promotores').delete().neq('id', -1);
-        if (promotores.length) await sb.from('promotores').insert(promotores.map(p => ({nome: p.nome, ativo: p.ativo})));
-        await sb.from('salas').delete().neq('id', -1);
-        if (salas.length) await sb.from('salas').insert(salas.map(s => ({nome: s.nome, link: s.link, horas: s.horas, ativo: s.ativo})));
-    } catch (e) { console.error('Supabase cadastro save error', e); }
+        const records = sb.from(table);
+        const query = previous
+            ? records.update(fields).eq('id', previous.id).eq('nome', previous.nome).eq('ativo', previous.ativo)
+            : records.insert(fields);
+        const { data, error } = await query.select('id').single();
+        if (error || !data?.id || (previous && data.id !== previous.id)) {
+            throw new Error('Alteração não confirmada');
+        }
+        await reloadCadastros();
+        return true;
+    } catch {
+        showToast('Não foi possível confirmar o cadastro. Confira os dados antes de tentar novamente.', 'error');
+        return false;
+    } finally {
+        savingCadastro = false;
+    }
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -1806,7 +1882,7 @@ function previewLote() {
     document.getElementById('btn-gerar-label').textContent = `Gerar ${horarios.length} Horários`;
 }
 
-function gerarLote() {
+async function gerarLote() {
     const data  = document.getElementById('q-data').value;
     const mes   = document.getElementById('q-mes').value;
     const ano   = parseInt(document.getElementById('q-ano').value) || currentAno;
@@ -1814,21 +1890,23 @@ function gerarLote() {
     const pro   = document.getElementById('q-promotor').value;
     if (!data) { showToast('Informe a data', 'error'); return; }
     const horarios = calcLoteHorarios();
+    const batchKey = JSON.stringify([ano, mes, data, mag, pro, horarios]);
+    if (pendingBatch?.key !== batchKey) pendingBatch = {key: batchKey, ids: horarios.map(novoIdAudiencia)};
     const novas = [];
-    horarios.forEach(hora => {
+    horarios.forEach((hora, index) => {
         const salaAutoLote = (salas.find(s => s.ativo && s.horas.includes(hora)) || {}).link || '';
         const nova = {
-            id: nextId++, ano, mes, data, hora,
+            id: pendingBatch.ids[index], ano, mes, data, hora,
             processo: '', reu: '', magistrado: mag, promotor: pro,
             status: '', pendencias: '', observacoes: '',
             reuPreso: false, projudi: false, intimacoes: false, termo: false,
             salaLink: salaAutoLote,
             criadoEm: new Date().toISOString().slice(0,10),
         };
-        audiencias.push(nova);
         novas.push(nova);
     });
-    saveData(novas);
+    if (!await saveData(novas, {insert: true})) return;
+    pendingBatch = null;
     currentAno = ano;
     render();
     showToast(`${horarios.length} horários criados em ${fmtData(data)}!`, 'success');
@@ -1837,11 +1915,10 @@ function gerarLote() {
 
 // ─── TOGGLE INLINE (PROJ / INTM / TERMO) ─────────────────────────────────────
 
-function toggleField(id, field) {
+async function toggleField(id, field) {
     const a = audiencias.find(x => x.id === id);
     if (!a) return;
-    a[field] = !a[field];
-    saveData([a]);
+    if (!await saveData([{...a, [field]: !a[field]}])) return;
     render();
 }
 
@@ -1911,7 +1988,7 @@ function removerLinhaReu(btn) {
     btn.closest('.reu-row').remove();
 }
 
-function salvarPreencher() {
+async function salvarPreencher() {
     const id  = parseInt(document.getElementById('p-id').value);
     const processo = document.getElementById('p-processo').value.trim();
     if (!processo) { showToast('Informe o número do processo', 'error'); return; }
@@ -1921,15 +1998,16 @@ function salvarPreencher() {
     const reusRevel = reuInputs.filter(row => row.querySelector('.reu-input').value.trim()).map(row => row.querySelector('.reu-revel-check')?.checked || false);
     const a = audiencias.find(x => x.id === id);
     if (!a) return;
-    a.processo = processo;
-    a.reu = reus.join(' / ');
-    a.reusPreso = reusPreso;
-    a.reuPreso = reusPreso.some(Boolean);
-    a.reusRevel = reusRevel;
-    a.reuRevel = reusRevel.some(Boolean);
-    a.reservado = document.getElementById('p-reservado').checked;
-    Object.assign(a, getPrioridades('p'));
-    saveData([a]);
+    const edited = {...a};
+    edited.processo = processo;
+    edited.reu = reus.join(' / ');
+    edited.reusPreso = reusPreso;
+    edited.reuPreso = reusPreso.some(Boolean);
+    edited.reusRevel = reusRevel;
+    edited.reuRevel = reusRevel.some(Boolean);
+    edited.reservado = document.getElementById('p-reservado').checked;
+    Object.assign(edited, getPrioridades('p'));
+    if (!await saveData([edited])) return;
     closePreencher();
     render();
     showToast('Audiência preenchida!', 'success');
@@ -2078,13 +2156,12 @@ async function replicarCampoDia(campo, selectId, checkId) {
     const alvo = audiencias.filter(a => a.data === data);
     const label = campo === 'magistrado' ? 'Magistrado' : 'Promotor';
     if (!confirm(`Aplicar "${valor}" como ${label} em todos os ${alvo.length} horário(s) do dia ${fmtData(data)}?`)) return;
-    alvo.forEach(a => { a[campo] = valor; });
-    await saveData(alvo);
+    if (!await saveData(alvo, {fields: {[campo]: valor}})) return;
     render();
     showToast(`${label} aplicado(a) a ${alvo.length} audiência(s) do dia ${fmtData(data)}.`, 'success');
 }
 
-function saveAudiencia() {
+async function saveAudiencia() {
     const id  = parseInt(document.getElementById('edit-id').value);
     const existing = audiencias.find(a => a.id === id);
     const obj = {
@@ -2112,9 +2189,7 @@ function saveAudiencia() {
         reservado: document.getElementById('f-reservado').checked,
         ...getPrioridades('f'),
     };
-    const idx = audiencias.findIndex(a => a.id === id);
-    if (idx >= 0) audiencias[idx] = obj;
-    saveData([obj]);
+    if (!existing || !await saveData([obj])) return;
     closeModal();
     render();
     showToast('Audiência salva!', 'success');
@@ -2123,46 +2198,36 @@ function saveAudiencia() {
 async function excluirSemDataHora() {
     const alvo = audiencias.filter(a => !a.data && !a.hora);
     if (!alvo.length) { showToast('Nenhuma audiência sem data e hora encontrada.', 'error'); return; }
-    if (!confirm(`Excluir ${alvo.length} audiência(s) sem data e hora? Esta ação não pode ser desfeita.`)) return;
+    if (!confirm('Excluir os horários sem data e hora?')) return;
     const ids = alvo.map(a => a.id);
-    audiencias = audiencias.filter(a => a.data || a.hora);
-    
-    try {
-        await sb.from('audiencias').delete().in('id', ids);
-        showToast(`${ids.length} audiência(s) excluída(s).`, 'success');
-    } catch (e) {
-        console.error('Supabase delete error', e);
-        showToast('Erro ao excluir no banco: ' + e.message, 'error');
-    }
+    const data = await confirmAudiencias(ids, () => sb.from('audiencias').delete()
+        .in('id', ids).is('data', null).or('hora.is.null,hora.eq.').select('id'));
+    if (!data) return;
+    const deleted = new Set(data.map(row => row.id));
+    audiencias = audiencias.filter(a => !deleted.has(a.id));
     render();
+    if (deleted.size === ids.length) showToast(`${deleted.size} audiência(s) excluída(s).`, 'success');
 }
 
-function deleteAudiencia(id) {
-    if (!confirm('Excluir esta audiência?')) return;
+async function deleteAudiencia(id) {
+    if (!confirm('Excluir esta audiência?')) return false;
+    const data = await confirmAudiencias([id], () => sb.from('audiencias').delete().eq('id', id).select('id'));
+    if (data?.[0]?.id !== id) return false;
     audiencias = audiencias.filter(a => a.id !== id);
-    
-    (async () => {
-        try { await sb.from('audiencias').delete().eq('id', id); }
-        catch (e) { console.error('Supabase delete error', e); }
-    })();
-    if (currentView==='agenda') render(); else renderRelatorios();
-    showToast('Audiência excluída','error');
+    if (currentView === 'agenda') render(); else renderRelatorios();
+    showToast('Audiência excluída', 'success');
+    return true;
 }
 
-function deleteFromPreencher() {
-    const id = parseInt(document.getElementById('p-id').value);
-    if (!id || !confirm('Excluir esta audiência?')) return;
-    closePreencher();
-    deleteAudiencia(id);
+async function deleteFromPreencher() {
+    const id = Number(document.getElementById('p-id').value);
+    if (id && await deleteAudiencia(id)) closePreencher();
 }
 
-function deleteFromModal() {
-    const id = parseInt(document.getElementById('edit-id').value);
-    if (!id || !confirm('Excluir esta audiência?')) return;
-    closeModal();
-    deleteAudiencia(id);
+async function deleteFromModal() {
+    const id = Number(document.getElementById('edit-id').value);
+    if (id && await deleteAudiencia(id)) closeModal();
 }
-
 
 // ─── CADASTROS ────────────────────────────────────────────────────────────────
 
@@ -2245,66 +2310,63 @@ function editCadastroItem(i) {
     const span = document.getElementById(`cadastro-nome-${i}`);
     if (!span) return;
     const current = list[i].nome;
-    span.innerHTML = `<input type="text" value="${current}" style="flex:1;padding:2px 6px;border:1px solid var(--primary);border-radius:4px;font-size:0.9rem"
-        onblur="saveCadastroEdit(${i},this.value)"
-        onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${current}';this.blur();}">`;
-    span.querySelector('input').focus();
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = current;
+    input.className = 'cadastro-inline-input';
+    input.addEventListener('blur', () => saveCadastroEdit(i, input.value), {once: true});
+    input.addEventListener('keydown', event => {
+        if (event.key === 'Escape') input.value = current;
+        if (event.key === 'Enter' || event.key === 'Escape') input.blur();
+    });
+    span.replaceChildren(input);
+    input.focus();
 }
 
-function saveCadastroEdit(i, novoNome) {
+async function saveCadastroEdit(i, novoNome) {
     novoNome = novoNome.trim();
     const list = cadastroSection==='magistrados' ? magistrados : promotores;
     if (!novoNome || novoNome === list[i].nome) { renderCadastroList(); return; }
     if (list.some((x, j) => j!==i && x.nome.toLowerCase()===novoNome.toLowerCase())) {
         showToast('Nome já cadastrado','error'); renderCadastroList(); return;
     }
-    list[i].nome = novoNome;
-    saveCadastros();
-    renderCadastroList();
+    if (!await saveCadastro(cadastroSection, {nome: novoNome}, list[i])) return;
     showToast('Nome atualizado!','success');
 }
 
-function addCadastroItem() {
+async function addCadastroItem() {
     const nome = document.getElementById('cadastro-input').value.trim();
     if (!nome) return;
     const list = cadastroSection==='magistrados' ? magistrados : promotores;
     if (list.some(x => x.nome.toLowerCase()===nome.toLowerCase())) { showToast('Já cadastrado','error'); return; }
-    list.push({nome, ativo: true});
-    saveCadastros();
+    if (!await saveCadastro(cadastroSection, {nome, ativo: true})) return;
     document.getElementById('cadastro-input').value = '';
     renderCadastroList();
     showToast('Cadastrado com sucesso!','success');
 }
 
-function removeCadastroItem(i) {
-    if (!confirm('Remover este cadastro?')) return;
-    if (cadastroSection==='magistrados') magistrados.splice(i,1);
-    else promotores.splice(i,1);
-    saveCadastros();
-    renderCadastroList();
+async function removeCadastroItem(i) {
+    if (!confirm('Inativar este cadastro?')) return;
+    const list = cadastroSection === 'magistrados' ? magistrados : promotores;
+    await saveCadastro(cadastroSection, {ativo: false}, list[i]);
 }
 
-function toggleCadastroAtivo(i) {
-    if (cadastroSection==='magistrados') magistrados[i].ativo = !magistrados[i].ativo;
-    else promotores[i].ativo = !promotores[i].ativo;
-    saveCadastros();
-    renderCadastroList();
+async function toggleCadastroAtivo(i) {
+    const list = cadastroSection === 'magistrados' ? magistrados : promotores;
+    await saveCadastro(cadastroSection, {ativo: !list[i].ativo}, list[i]);
 }
 
-function aplicarSalasAudiencias() {
-    // Para cada audiência pautada, preenche salaLink com base no horário (não sobrescreve link já definido manualmente)
-    const alteradas = [];
-    audiencias.forEach(a => {
+async function aplicarSalasAudiencias() {
+    let total = 0;
+    for (const a of audiencias.filter(row => !row.salaLink)) {
         const sala = salas.find(s => s.ativo && s.horas.includes(a.hora));
-        if (sala && a.salaLink !== sala.link) {
-            a.salaLink = sala.link;
-            alteradas.push(a);
-        }
-    });
-    if (alteradas.length) {
-        saveData(alteradas);
+        if (!sala?.link) continue;
+        if (!await saveData([{...a, salaLink: sala.link}])) break;
+        total++;
+    }
+    if (total) {
         render();
-        showToast(`Link de sala atribuído a ${alteradas.length} audiência(s).`, 'success');
+        showToast(`Link de sala atribuído a ${total} audiência(s).`, 'success');
     }
 }
 
@@ -2316,16 +2378,14 @@ function sortSalas() {
     });
 }
 
-function addSala() {
+async function addSala() {
     const nome = document.getElementById('sala-input-nome').value.trim();
     const link = document.getElementById('sala-input-link').value.trim();
     const horasRaw = document.getElementById('sala-input-horas').value.trim();
     if (!nome) { showToast('Informe o nome da sala', 'error'); return; }
     if (!link) { showToast('Informe o link da sala', 'error'); return; }
     const horas = horasRaw ? horasRaw.split(',').map(h => h.trim()).filter(Boolean) : [];
-    salas.push({ nome, link, horas, ativo: true });
-    sortSalas();
-    saveCadastros();
+    if (!await saveCadastro('salas', {nome, link, horas, ativo: true})) return;
     document.getElementById('sala-input-nome').value = '';
     document.getElementById('sala-input-link').value = '';
     document.getElementById('sala-input-horas').value = '';
@@ -2342,35 +2402,26 @@ function cancelarEditSala(i) {
     document.getElementById('sala-view-' + i).style.display = 'flex';
     document.getElementById('sala-edit-' + i).style.display = 'none';
 }
-function salvarEditSala(i) {
+async function salvarEditSala(i) {
     const nome = document.getElementById('sala-edit-nome-' + i).value.trim();
     const link = document.getElementById('sala-edit-link-' + i).value.trim();
     const horasRaw = document.getElementById('sala-edit-horas-' + i).value.trim();
     if (!nome) { showToast('Informe o nome da sala', 'error'); return; }
-    salas[i].nome = nome;
-    salas[i].link = link;
-    salas[i].horas = horasRaw ? horasRaw.split(',').map(h => h.trim()).filter(Boolean) : [];
-    sortSalas();
-    saveCadastros();
+    const horas = horasRaw ? horasRaw.split(',').map(h => h.trim()).filter(Boolean) : [];
+    if (!await saveCadastro('salas', {nome, link, horas}, salas[i])) return;
     renderCadastroList();
     buildSelectores();
     showToast('Sala atualizada!', 'success');
 }
 function editSala(i) { abrirEditSala(i); }
 
-function removeSala(i) {
-    if (!confirm('Remover esta sala?')) return;
-    salas.splice(i, 1);
-    sortSalas();
-    saveCadastros();
-    renderCadastroList();
-    buildSelectores();
+async function removeSala(i) {
+    if (!confirm('Inativar esta sala?')) return;
+    await saveCadastro('salas', {ativo: false}, salas[i]);
 }
 
-function toggleSalaAtivo(i) {
-    salas[i].ativo = !salas[i].ativo;
-    saveCadastros();
-    renderCadastroList();
+async function toggleSalaAtivo(i) {
+    await saveCadastro('salas', {ativo: !salas[i].ativo}, salas[i]);
 }
 
 // ─── CHARTS ──────────────────────────────────────────────────────────────────
@@ -2493,7 +2544,7 @@ function confirmarRelatorioPDF() {
 
 function _imprimirRelatorioPDF(anos, opts) {
     const dataGeracao = new Date().toLocaleString('pt-BR');
-    let html = `<html><head><meta charset="UTF-8"><title>Relatório Comparativo - 7ª Vara Criminal</title>
+    let html = `<html><head><meta charset="UTF-8"><title>Relatório Comparativo - Vara Única de Benjamin Constant/AM</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #2d3748; padding: 24px; }
         h1 { font-size: 16px; color: #1a2a6c; margin-bottom: 2px; }
@@ -2505,7 +2556,7 @@ function _imprimirRelatorioPDF(anos, opts) {
         td:first-child, th:first-child { text-align: left; }
     </style></head><body>
     <h1>Relatório Comparativo de Audiências</h1>
-    <div class="sub">7ª Vara Criminal da Comarca de Manaus · TJAM &nbsp;·&nbsp; Anos: ${anos.sort().join(', ')} &nbsp;·&nbsp; Gerado em ${dataGeracao}</div>`;
+    <div class="sub">Vara Única da Comarca de Benjamin Constant/AM · TJAM &nbsp;·&nbsp; Anos: ${anos.sort().join(', ')} &nbsp;·&nbsp; Gerado em ${dataGeracao}</div>`;
 
     if (opts.incluirResumo) {
         html += `<h2>Resumo Geral por Status</h2><table><thead><tr><th>Indicador</th>${anos.map(y=>`<th>${y}</th>`).join('')}</tr></thead><tbody>`;
@@ -2689,12 +2740,12 @@ function _imprimirPDF(filtered, cols, nomeUsuario) {
     }
 </style></head><body>
 <div class="pg-footer">
-    <span>7ª Vara Criminal · TJAM · Sistema de Gestão de Audiências</span>
+    <span>Vara Única de Benjamin Constant/AM · TJAM · Sistema de Gestão de Audiências</span>
     <span>Documento gerado por: <strong>${usuario}</strong> &nbsp;·&nbsp; ${dataHora}</span>
 </div>
 <div class="cabecalho">
     <div class="cab-titulo">
-        <h1>Pauta de Audiências · 7ª Vara Criminal</h1>
+        <h1>Pauta de Audiências · Vara Única de Benjamin Constant/AM</h1>
         <p>Comarca de Manaus · Tribunal de Justiça do Amazonas</p>
     </div>
     <div class="cab-meta">
