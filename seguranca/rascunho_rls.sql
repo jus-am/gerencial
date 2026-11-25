@@ -17,8 +17,7 @@ revoke all on public.perfis_usuarios,public.permissoes_usuarios from public,anon
 grant select on public.perfis_usuarios,public.permissoes_usuarios to authenticated;
 create policy perfil_proprio on public.perfis_usuarios for select to authenticated using(user_id=(select auth.uid()));
 create policy permissoes_proprias on public.permissoes_usuarios for select to authenticated using(user_id=(select auth.uid()));
-insert into public.perfis_usuarios(user_id,nome,perfil,ativo)
-select user_id,'Diretor de Secretaria','administrador',true from public.membros_mural where papel='diretor';
+-- Perfis dos aplicativos são provisionados independentemente do mural.
 -- Nenhum usuário, inclusive o diretor do mural, recebe acesso automático aos aplicativos.
 -- Autorizações de cada aplicativo deverão ser provisionadas separadamente antes da troca de políticas.
 create schema if not exists gerencial_privado;
