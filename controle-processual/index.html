@@ -145,7 +145,7 @@
                 <input type="password" id="auth-password" placeholder="••••••••" style="padding:0.6rem 0.75rem;border:1px solid #e2e8f0;border-radius:8px;font-family:inherit;font-size:0.9rem;" onkeydown="if(event.key==='Enter')authSignIn()">
             </div>
             <button onclick="authSignIn()" style="padding:0.65rem 1rem;border-radius:8px;border:none;background:#1a2a6c;color:white;font-family:inherit;font-size:0.92rem;font-weight:700;cursor:pointer;">Entrar</button>
-            <button onclick="authSignUp()" style="padding:0.6rem 1rem;border-radius:8px;border:1px dashed #1a2a6c;background:white;color:#1a2a6c;font-family:inherit;font-size:0.85rem;font-weight:600;cursor:pointer;">Criar Conta</button>
+
         </div>
     </div>
 </div>
@@ -427,15 +427,7 @@ async function authSignIn() {
     const { error } = await sb.auth.signInWithPassword({ email, password });
     if (error) showAuthError(traduzErroAuth(error.message));
 }
-async function authSignUp() {
-    hideAuthError();
-    const email = document.getElementById('auth-email').value.trim();
-    const password = document.getElementById('auth-password').value;
-    if (!email || !password) { showAuthError('Informe e-mail e senha.'); return; }
-    const { error } = await sb.auth.signUp({ email, password });
-    if (error) { showAuthError(traduzErroAuth(error.message)); return; }
-    showAuthError('Conta criada! Verifique seu e-mail para confirmar (se exigido) ou faça login.');
-}
+
 async function authSignOut() { await sb.auth.signOut(); }
 
 sb.auth.onAuthStateChange((event, session) => {
@@ -501,10 +493,10 @@ async function initApp() {
         localStorage.setItem(STORAGE_IDOSOS, JSON.stringify(idosos));
         localStorage.setItem(STORAGE_CARTAS, JSON.stringify(cartas));
     } catch (e) {
-        console.error('Supabase init error, falling back to local storage', e);
-        idosos = JSON.parse(localStorage.getItem(STORAGE_IDOSOS) || '[]');
-        cartas = JSON.parse(localStorage.getItem(STORAGE_CARTAS) || '[]');
-        showToast('Modo offline — sincronização indisponível', 'error');
+        console.error('Falha ao carregar dados', e);
+        idosos = []; cartas = [];
+        showToast('Não foi possível carregar os dados. Recarregue a página.', 'error');
+        return;
     }
     nextIdosoId = idosos.length ? Math.max(...idosos.map(p => p.id)) + 1 : 1;
     nextCartaId = cartas.length ? Math.max(...cartas.map(c => c.id)) + 1 : 1;
