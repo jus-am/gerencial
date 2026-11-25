@@ -28,7 +28,7 @@ async function logIn(page, route) {
         await portal.locator('#mural-novo').click();
         await portal.locator('#mural-form [name=titulo]').fill('Aviso de integração fictício');
         await portal.locator('#mural-form [name=conteudo]').fill('Registro descartável');
-        await portal.locator('#mural-form button[type=submit]').click();
+        await portal.locator('#mural-form').getByRole('button',{name:'Salvar aviso'}).click();
         await portal.locator('#mural-lista').getByText('Aviso de integração fictício').waitFor();
         console.log('OK: autenticação e gravação de aviso pelo Gerencial');
         const agenda = await context.newPage();
