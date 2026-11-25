@@ -995,7 +995,7 @@ let cadastroSection = 'magistrados';
 
 const SUPABASE_URL = 'https://qcvietuczbysditpkopr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjdmlldHVjemJ5c2RpdHBrb3ByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjkzMjIsImV4cCI6MjA5NzIwNTMyMn0.HcQ5AAwaM9WP9MAm3KSO5LtJKhUzTIRkpaIGeW2n_os';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {auth:{storageKey:'agenda-bc-auth-v2'}});
 
 // ─── AUTH ──────────────────────────────────────────────────────────────────
 
@@ -1036,10 +1036,17 @@ async function authSignIn() {
 
 
 async function authSignOut() {
-    await sb.auth.signOut();
+    const {error} = await sb.auth.signOut({scope:'local'}); if(error) showAuthError('Não foi possível encerrar a sessão.');
 }
 
+let activeSessionUser = null;
 sb.auth.onAuthStateChange((event, session) => {
+    if (activeSessionUser && (!session || session.user.id !== activeSessionUser)) {
+        document.getElementById('app-content').style.display = 'none';
+        window.location.reload();
+        return;
+    }
+    if (session) activeSessionUser = session.user.id;
     const overlay = document.getElementById('auth-overlay');
     const appContent = document.getElementById('app-content');
     if (session) {
@@ -1223,10 +1230,10 @@ async function initApp() {
         const { data: salsData, error: salasError } = await sb.from('salas').select('*').order('id');
         if (salasError) throw salasError;
         salas = (salsData || []).map(s => ({nome: s.nome, link: s.link, horas: s.horas || [], ativo: s.ativo !== false}));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(audiencias));
-        localStorage.setItem(STORAGE_MAG, JSON.stringify(magistrados));
-        localStorage.setItem(STORAGE_PRO, JSON.stringify(promotores));
-        localStorage.setItem(STORAGE_SAL, JSON.stringify(salas));
+        
+        
+        
+        
     } catch (e) {
         console.error('Falha ao carregar dados', e);
         audiencias = []; magistrados = []; promotores = []; salas = [];
@@ -1264,7 +1271,7 @@ function handleRealtimeAudiencia(payload) {
         const idx = audiencias.findIndex(a => a.id === updated.id);
         if (idx >= 0) audiencias[idx] = updated; else audiencias.push(updated);
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(audiencias));
+    
     nextId = audiencias.length ? Math.max(nextId, ...audiencias.map(a => a.id)) + 1 : nextId;
     if (currentView === 'agenda') render(); else if (currentView === 'relatorios') renderRelatorios();
 }
@@ -1278,16 +1285,16 @@ async function reloadCadastros() {
         promotores = (pros || []).map(p => ({nome: p.nome, ativo: p.ativo}));
         salas = (sals || []).map(s => ({nome: s.nome, link: s.link, horas: s.horas || [], ativo: s.ativo !== false}));
         sortSalas();
-        localStorage.setItem(STORAGE_MAG, JSON.stringify(magistrados));
-        localStorage.setItem(STORAGE_PRO, JSON.stringify(promotores));
-        localStorage.setItem(STORAGE_SAL, JSON.stringify(salas));
+        
+        
+        
         if (typeof renderCadastroList === 'function') renderCadastroList();
         buildSelectores();
     } catch (e) { console.error('Supabase reloadCadastros error', e); }
 }
 
 async function saveData(rows) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(audiencias));
+    
     try {
         const { error } = await sb.from('audiencias').upsert((rows || audiencias).map(toSupabaseRow));
         if (error) {
@@ -1303,9 +1310,9 @@ async function saveData(rows) {
 }
 
 async function saveCadastros() {
-    localStorage.setItem(STORAGE_MAG, JSON.stringify(magistrados));
-    localStorage.setItem(STORAGE_PRO, JSON.stringify(promotores));
-    localStorage.setItem(STORAGE_SAL, JSON.stringify(salas));
+    
+    
+    
     try {
         await sb.from('magistrados').delete().neq('id', -1);
         if (magistrados.length) await sb.from('magistrados').insert(magistrados.map(m => ({nome: m.nome, ativo: m.ativo})));
@@ -2119,7 +2126,7 @@ async function excluirSemDataHora() {
     if (!confirm(`Excluir ${alvo.length} audiência(s) sem data e hora? Esta ação não pode ser desfeita.`)) return;
     const ids = alvo.map(a => a.id);
     audiencias = audiencias.filter(a => a.data || a.hora);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(audiencias));
+    
     try {
         await sb.from('audiencias').delete().in('id', ids);
         showToast(`${ids.length} audiência(s) excluída(s).`, 'success');
@@ -2133,7 +2140,7 @@ async function excluirSemDataHora() {
 function deleteAudiencia(id) {
     if (!confirm('Excluir esta audiência?')) return;
     audiencias = audiencias.filter(a => a.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(audiencias));
+    
     (async () => {
         try { await sb.from('audiencias').delete().eq('id', id); }
         catch (e) { console.error('Supabase delete error', e); }

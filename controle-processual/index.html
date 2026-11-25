@@ -380,7 +380,7 @@
 // ─── DATA LAYER (Supabase) ────────────────────────────────────────────────
 const SUPABASE_URL = 'https://qcvietuczbysditpkopr.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjdmlldHVjemJ5c2RpdHBrb3ByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjkzMjIsImV4cCI6MjA5NzIwNTMyMn0.HcQ5AAwaM9WP9MAm3KSO5LtJKhUzTIRkpaIGeW2n_os';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {auth:{storageKey:'controle-bc-auth-v2'}});
 
 const STORAGE_IDOSOS = 'controleProcessual_idosos_v1';
 const STORAGE_CARTAS = 'controleProcessual_cartas_v1';
@@ -428,9 +428,16 @@ async function authSignIn() {
     if (error) showAuthError(traduzErroAuth(error.message));
 }
 
-async function authSignOut() { await sb.auth.signOut(); }
+async function authSignOut() { const {error} = await sb.auth.signOut({scope:'local'}); if(error) showAuthError('Não foi possível encerrar a sessão.'); }
 
+let activeSessionUser = null;
 sb.auth.onAuthStateChange((event, session) => {
+    if (activeSessionUser && (!session || session.user.id !== activeSessionUser)) {
+        document.getElementById('app-content').style.display = 'none';
+        window.location.reload();
+        return;
+    }
+    if (session) activeSessionUser = session.user.id;
     const overlay = document.getElementById('auth-overlay');
     const appContent = document.getElementById('app-content');
     if (session) {
@@ -490,8 +497,8 @@ async function initApp() {
         if (e2) throw e2;
         idosos = (piRows || []).map(rowToIdoso);
         cartas = (cpRows || []).map(rowToCarta);
-        localStorage.setItem(STORAGE_IDOSOS, JSON.stringify(idosos));
-        localStorage.setItem(STORAGE_CARTAS, JSON.stringify(cartas));
+        
+        
     } catch (e) {
         console.error('Falha ao carregar dados', e);
         idosos = []; cartas = [];
@@ -508,12 +515,12 @@ async function initApp() {
 function subscribeRealtime() {
     sb.channel('processos-idosos-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'processos_idosos' }, payload => {
-          handleRealtime(idosos, payload, rowToIdoso, () => { localStorage.setItem(STORAGE_IDOSOS, JSON.stringify(idosos)); renderIdosos(); });
+          handleRealtime(idosos, payload, rowToIdoso, () => {  renderIdosos(); });
       })
       .subscribe();
     sb.channel('cartas-precatorias-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cartas_precatorias' }, payload => {
-          handleRealtime(cartas, payload, rowToCarta, () => { localStorage.setItem(STORAGE_CARTAS, JSON.stringify(cartas)); renderCartas(); });
+          handleRealtime(cartas, payload, rowToCarta, () => {  renderCartas(); });
       })
       .subscribe();
 }
@@ -530,22 +537,22 @@ function handleRealtime(list, payload, mapFn, afterFn) {
 }
 
 async function persistIdoso(p) {
-    localStorage.setItem(STORAGE_IDOSOS, JSON.stringify(idosos));
+    
     try { await sb.from('processos_idosos').upsert(idosoToRow(p)); }
     catch (e) { console.error('Supabase save error', e); showToast('Erro ao sincronizar', 'error'); }
 }
 async function persistCarta(c) {
-    localStorage.setItem(STORAGE_CARTAS, JSON.stringify(cartas));
+    
     try { await sb.from('cartas_precatorias').upsert(cartaToRow(c)); }
     catch (e) { console.error('Supabase save error', e); showToast('Erro ao sincronizar', 'error'); }
 }
 async function removeIdoso(id) {
-    localStorage.setItem(STORAGE_IDOSOS, JSON.stringify(idosos));
+    
     try { await sb.from('processos_idosos').delete().eq('id', id); }
     catch (e) { console.error('Supabase delete error', e); }
 }
 async function removeCarta(id) {
-    localStorage.setItem(STORAGE_CARTAS, JSON.stringify(cartas));
+    
     try { await sb.from('cartas_precatorias').delete().eq('id', id); }
     catch (e) { console.error('Supabase delete error', e); }
 }
