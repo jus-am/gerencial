@@ -1,0 +1,59 @@
+name: Ensaio da mudança de produção em banco fictício
+on:
+  push:
+    branches: [preparacao/gerencial-2-producao]
+    paths: ['seguranca/*-autorizacao.sql', '.github/workflows/ensaio-liberacao.yml']
+permissions:
+  contents: read
+jobs:
+  ensaio:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Iniciar PostgreSQL isolado
+        run: |
+          docker network create -o com.docker.network.bridge.host_binding_ipv4=127.0.0.1 gerencial-ensaio
+          npx --yes supabase@2.98.0 start --network-id gerencial-ensaio -x studio,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta >/dev/null 2>&1
+      - name: Ensaiar preparo, ativação e reversão
+        shell: bash
+        run: |
+          db=(docker exec -i -e 'PGOPTIONS=-c gerencial.liberacao_producao=confirmada' supabase_db_gerencial-2-homologacao-local psql -U postgres -d postgres -v ON_ERROR_STOP=1)
+          cat audiencias/supabase_schema.sql audiencias/supabase_add_salas.sql controle-processual/supabase_schema.sql | "${db[@]}" >/dev/null
+          "${db[@]}" >/dev/null <<'SQL'
+          do $$
+          declare t text; existing record;
+          begin
+            foreach t in array array['audiencias','magistrados','promotores','salas','processos_idosos','cartas_precatorias'] loop
+              for existing in select policyname from pg_catalog.pg_policies where schemaname='public' and tablename=t loop
+                execute format('drop policy %I on public.%I',existing.policyname,t);
+              end loop;
+              execute format('create policy "authenticated access" on public.%I for all to public using (auth.role() = ''authenticated'') with check (auth.role() = ''authenticated'')',t);
+            end loop;
+          end $$;
+          insert into auth.users(id) values ('00000000-0000-4000-8000-000000000071');
+          insert into public.audiencias(id, processo) values (71, 'FICTICIO-ENSAIO');
+          create table public.tempo_apn (id bigint primary key);
+          create policy tempo_preservado on public.tempo_apn for select using (false);
+          SQL
+          "${db[@]}" < seguranca/preparar-autorizacao.sql >/dev/null
+          if "${db[@]}" < seguranca/ativar-autorizacao.sql >/dev/null 2>&1; then
+            echo 'Ativação passou sem provisionamento'; exit 1
+          fi
+          echo 'OK: sem provisionamento a ativação é bloqueada'
+          "${db[@]}" >/dev/null <<'SQL'
+          insert into public.perfis_usuarios values
+            ('00000000-0000-4000-8000-000000000071','audiencias','Servidor fictício','servidor',true),
+            ('00000000-0000-4000-8000-000000000071','controle_processual','Servidor fictício','servidor',true);
+          insert into public.permissoes_usuarios values
+            ('00000000-0000-4000-8000-000000000071','audiencias','select'),
+            ('00000000-0000-4000-8000-000000000071','controle_processual','select');
+          SQL
+          "${db[@]}" < seguranca/ativar-autorizacao.sql >/dev/null
+          test "$("${db[@]}" -Atc "select count(*) from pg_policies where schemaname='public' and policyname like 'gerencial_%'")" = 24
+          test "$("${db[@]}" -Atc "select count(*) from pg_policies where schemaname='public' and tablename='tempo_apn' and policyname='tempo_preservado'")" = 1
+          echo 'OK: políticas dos módulos ativadas, Tempo APN preservado'
+          "${db[@]}" < seguranca/reverter-autorizacao.sql >/dev/null
+          test "$("${db[@]}" -Atc "select count(*) from pg_policies where schemaname='public' and policyname='authenticated access'")" = 6
+          test "$("${db[@]}" -Atc "select count(*) from public.audiencias where id=71 and processo='FICTICIO-ENSAIO'")" = 1
+          echo 'OK: políticas legadas restauradas e registro fictício preservado'
