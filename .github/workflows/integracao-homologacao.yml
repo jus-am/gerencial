@@ -1,0 +1,95 @@
+name: Integração isolada do Gerencial
+on:
+  push:
+    branches: [homologacao/integracao-gerencial-2]
+permissions:
+  contents: read
+jobs:
+  supabase:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Inicializar instância descartável
+        shell: bash
+        run: |
+          docker network create -o com.docker.network.bridge.host_binding_ipv4=127.0.0.1 gerencial-integracao
+          npx --yes supabase@2.98.0 start --network-id gerencial-integracao -x studio,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta >/dev/null 2>&1 || { echo 'Falha ao inicializar o Supabase'; exit 1; }
+          node seguranca/preparar-banco-local.cjs | docker exec -i -e 'PGOPTIONS=-c gerencial.homologacao_local=sim' supabase_db_gerencial-2-homologacao-local psql -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null
+      - name: Exercitar Auth e API com identidades fictícias
+        shell: bash
+        run: |
+          umask 077
+          npx --yes supabase@2.98.0 status -o json > "$RUNNER_TEMP/gerencial-supabase.json"
+          node - "$RUNNER_TEMP/gerencial-supabase.json" <<'NODE'
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const { execFileSync } = require('node:child_process');
+          const { randomBytes } = require('node:crypto');
+          const status = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const base = 'http://127.0.0.1:54321';
+          const publicKey = status.PUBLISHABLE_KEY;
+          assert.match(publicKey ?? '', /^sb_publishable_/);
+          assert.ok(status.SERVICE_ROLE_KEY);
+          async function call(path, {token=publicKey, key=publicKey, method='GET', body}={}) {
+              return fetch(base+path, {method, headers:{apikey:key, Authorization:'Bearer '+token,
+                  'Content-Type':'application/json', Prefer:'return=representation'},
+                  body:body===undefined?undefined:JSON.stringify(body)});
+          }
+          async function createIdentity(name) {
+              const credentials = {email:name+'@example.test', password:randomBytes(24).toString('hex')};
+              const response = await call('/auth/v1/admin/users',{method:'POST',key:status.SERVICE_ROLE_KEY,
+                  token:status.SERVICE_ROLE_KEY,body:{...credentials,email_confirm:true}});
+              assert.ok(response.ok, 'Criação de identidade fictícia: '+response.status);
+              const {id} = await response.json();
+              assert.match(id,/^[a-f0-9-]{36}$/i);
+              return {id,credentials};
+          }
+          async function signIn(identity) {
+              const response = await call('/auth/v1/token?grant_type=password',{method:'POST',body:identity.credentials});
+              assert.ok(response.ok, 'Login: '+response.status);
+              const {access_token,refresh_token} = await response.json();
+              assert.ok(access_token && refresh_token);
+              return {access_token,refresh_token};
+          }
+          (async()=>{
+              const signup = await call('/auth/v1/signup',{method:'POST',body:{email:'bloqueado@example.test',password:randomBytes(24).toString('hex')}});
+              assert.ok(!signup.ok,'Autocadastro precisa estar bloqueado');
+              console.log('OK: autocadastro bloqueado');
+              const [writer, reader, denied] = await Promise.all([createIdentity('servidor'),createIdentity('consulta'),createIdentity('sem-acesso')]);
+              const sql = `begin;
+              insert into public.perfis_usuarios values
+                ('${writer.id}','audiencias','Servidor fictício','servidor',true),
+                ('${reader.id}','audiencias','Consulta fictícia','consulta',true);
+              insert into public.permissoes_usuarios values
+                ('${writer.id}','audiencias','select'),('${writer.id}','audiencias','insert'),
+                ('${writer.id}','audiencias','update'),('${writer.id}','audiencias','delete'),
+                ('${reader.id}','audiencias','select'),('${reader.id}','audiencias','update');
+              commit;`;
+              execFileSync('docker',['exec','-i','supabase_db_gerencial-2-homologacao-local','psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1'],
+                  {input:sql,stdio:['pipe','ignore','ignore']});
+              const [writerSession,readerSession,deniedSession]=await Promise.all([signIn(writer),signIn(reader),signIn(denied)]);
+              console.log('OK: login das três identidades de teste');
+              const w=writerSession.access_token,r=readerSession.access_token,d=deniedSession.access_token;
+              const table='/rest/v1/audiencias';
+              const inserted=await call(table,{token:w,method:'POST',body:{id:100,processo:'EXEMPLO'}});
+              assert.equal(inserted.status,201);
+              assert.equal((await inserted.json())[0].id,100);
+              assert.equal((await (await call(table,{token:r})).json()).length,1);
+              assert.deepEqual(await (await call(table,{token:d})).json(),[]);
+              assert.ok(!(await call(table)).ok);
+              assert.deepEqual(await (await call('/rest/v1/processos_idosos',{token:w})).json(),[]);
+              console.log('OK: leitura, inserção e isolamento por aplicativo');
+              const deniedEdit=await call(table+'?id=eq.100',{token:r,method:'PATCH',body:{processo:'INDEVIDO'}});
+              assert.deepEqual(await deniedEdit.json(),[]);
+              const edited=await call(table+'?id=eq.100',{token:w,method:'PATCH',body:{processo:'EDITADO'}});
+              assert.equal((await edited.json())[0].processo,'EDITADO');
+              const deleted=await call(table+'?id=eq.100',{token:w,method:'DELETE'});
+              assert.equal((await deleted.json())[0].id,100);
+              assert.deepEqual(await (await call(table,{token:w})).json(),[]);
+              console.log('OK: atualização e exclusão confirmadas e consulta sem escrita');
+              const refresh=await call('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:{refresh_token:writerSession.refresh_token}});
+              assert.ok(refresh.ok,'Renovação de sessão');
+              console.log('OK: renovação de sessão');
+          })().catch(error=>{console.error(error.message);process.exitCode=1});
+          NODE
