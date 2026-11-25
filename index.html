@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Central de Gestão - 7VCRIM</title>
+    <title>Central de Gestão - Benjamin Constant</title>
     
     <!-- Ícone da aba do navegador (Favicon) -->
     <link rel="icon" type="image/png" href="logo.png">
@@ -15,7 +15,7 @@
     <!-- PWA: Suporte específico para iPhone/iPad (iOS) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="7VCRIM">
+    <meta name="apple-mobile-web-app-title" content="Gerencial">
     <link rel="apple-touch-icon" href="logo.png">
     
     <!-- Ícones da Font Awesome (Estilo Profissional) -->
@@ -329,6 +329,28 @@
             .quick-btn { font-size: 0.85rem; padding: 0.6rem 1.2rem; }
             .section-title { font-size: 1.2rem; margin: 1.2rem 0 1rem 0; }
         }
+        /* Ajustes de densidade e acessibilidade da página inicial */
+        body { padding: 1.25rem; max-width: 1600px; }
+        .header { padding: 1rem 1.5rem; margin-bottom: 1.25rem; }
+        .quick-access-container { gap: .6rem; margin-bottom: 1.25rem; }
+        .quick-btn { padding: .6rem 1rem; }
+        .section-title { font-size: 1.2rem; margin: 1.1rem 0 .7rem; }
+        .grid-container { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: .85rem; margin-bottom: 1rem; }
+        .card { padding: 1rem .8rem; }
+        .icon-wrapper { width: 46px; height: 46px; font-size: 1.4rem; margin-bottom: .55rem; }
+        .card h3 { font-size: .98rem; margin-bottom: .25rem; }
+        .card p { font-size: .8rem; color: #526174; }
+        a:focus-visible, button:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+        @media (max-width: 480px) {
+            body { padding: .65rem; }
+            .grid-container { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+            .quick-btn { padding: .55rem .75rem; }
+            .card { overflow-wrap: anywhere; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition: none !important; }
+            .card:hover, .quick-btn:hover, .card:hover .icon-wrapper { transform: none; }
+        }
     </style>
 </head>
 <body>
@@ -400,20 +422,16 @@
     <script>
         const dashboardData = [
             {
-                sectionId: "planilhas",
-                sectionTitle: "Planilhas e Sistemas Interno",
+                sectionId: "aplicativos",
+                sectionTitle: "Aplicativos Gerenciais",
                 sectionIcon: "fa-folder-open",
                 items: [
                     { title: "Réus Presos", desc: "Sistema Interno de Controle de Réus Presos", link: "https://controle-reus-tjam.web.app/", type: "planilha", icon: "fa-handcuffs" },
                     { title: "Diário de Secretaria", desc: "Uso exclusivo do Diretor de Secretaria", link: "https://diario-secretaria-v2.web.app/", type: "planilha", icon: "fa-book-open" },
                     { title: "Cálculo de Suspensão e Prescrição", desc: "Ferramenta de cálculo / Pena Abstrata", link: "https://7vcriminal.github.io/calculadora-prescricao/", type: "planilha", icon: "fa-calculator" },
                     { title: "Sistema de Resumo AIJ", desc: "Assistente de Resumo Processual para Audiências", link: "https://resumo-processual-aij.web.app/", type: "planilha", icon: "fa-wand-magic-sparkles" },
-                    { title: "Audiências 2026", desc: "Pauta de Audiências 2026", link: "./audiencias/", type: "planilha", icon: "fa-calendar-days" },
-                    { title: "Controle Processual", desc: "Processos Idosos e Cartas Precatórias", link: "./controle-processual/", type: "planilha", icon: "fa-scale-balanced" },
-                    { title: "Acervo sem Sentença", desc: "Processos da Meta 1 sem Julgamento", link: "https://docs.google.com/spreadsheets/d/12OBexxe-2ygvTBzXJIBTN1ftnc3_rnWxlFV3CDQLTKY/edit", type: "planilha", icon: "fa-gavel" },
-                    { title: "Tempo APN", desc: "Processos por tempo de tramitação", link: "#", type: "planilha", icon: "fa-hourglass-half" },
-                    { title: "Suspensões e Prescrições", desc: "Controle de Suspensões e Prescrições", link: "https://docs.google.com/spreadsheets/d/12BY4Izw3QiIFQy2iAAypzaae6hgkq5UPBqkLbFHfMuE/edit", type: "planilha", icon: "fa-file-signature" },
-                    { title: "Presos SEAP", desc: "Listagem de Presos da SEAP", link: "https://office365prodam-my.sharepoint.com/:x:/g/personal/estatistica_cosipe_seap_am_gov_br/IQAUJqweRhZgRb5szRgIAZ92AZQagp_M27wFAr4ehtXfUjA?rtime=Q5DNMiGw3kg", type: "planilha", icon: "fa-person-walking-dashed-line-arrow-right" }
+                    { title: "Audiências", desc: "Pauta e controle de audiências", link: "./audiencias/", type: "planilha", icon: "fa-calendar-days" },
+                    { title: "Controle Processual", desc: "Processos Idosos e Cartas Precatórias", link: "./controle-processual/", type: "planilha", icon: "fa-scale-balanced" }
                 ]
             },
             {
@@ -429,6 +447,17 @@
                     { title: "Estratégico CGJ", desc: "Painel BI Estratégico da CGJ", link: "https://app.powerbi.com/view?r=eyJrIjoiN2VjMTZmYzAtNzhjYy00N2ZkLTlkOTMtMGI5MmYwODJkNzA4IiwidCI6IjcyNzEwODAyLTlhMzMtNGQyZC1hMDU1LTMzZDMxY2I0N2Q2MSJ9", type: "painel", icon: "fa-chart-line" },
                     { title: "Baixa/Arquivamento", desc: "Painel BI de Baixa", link: "https://app.powerbi.com/view?r=eyJrIjoiN2VjMTZmYzAtNzhjYy00N2ZkLTlkOTMtMGI5MmYwODJkNzA4IiwidCI6IjcyNzEwODAyLTlhMzMtNGQyZC1hMDU1LTMzZDMxY2I0N2Q2MSJ9", type: "painel", icon: "fa-box-archive" },
                     { title: "Painéis BIs", desc: "Painel BI Completo", link: "https://app.powerbi.com/view?r=eyJrIjoiOGM0MGQ1NjctYWQ5Yy00N2EzLThlN2QtZWRhY2FjYmZkNDQ2IiwidCI6IjcyNzEwODAyLTlhMzMtNGQyZC1hMDU1LTMzZDMxY2I0N2Q2MSJ9", type: "painel", icon: "fa-chart-column" }
+                ]
+            },
+            {
+                sectionId: "planilhas",
+                sectionTitle: "Planilhas e Controles Auxiliares",
+                sectionIcon: "fa-file-excel",
+                items: [
+                    { title: "Acervo sem Sentença", desc: "Processos da Meta 1 sem Julgamento", link: "https://docs.google.com/spreadsheets/d/12OBexxe-2ygvTBzXJIBTN1ftnc3_rnWxlFV3CDQLTKY/edit", type: "planilha", icon: "fa-gavel" },
+                    { title: "Tempo APN", desc: "Processos por tempo de tramitação", link: "#", type: "planilha", icon: "fa-hourglass-half" },
+                    { title: "Suspensões e Prescrições", desc: "Controle de Suspensões e Prescrições", link: "https://docs.google.com/spreadsheets/d/12BY4Izw3QiIFQy2iAAypzaae6hgkq5UPBqkLbFHfMuE/edit", type: "planilha", icon: "fa-file-signature" },
+                    { title: "Presos SEAP", desc: "Listagem de Presos da SEAP", link: "https://office365prodam-my.sharepoint.com/:x:/g/personal/estatistica_cosipe_seap_am_gov_br/IQAUJqweRhZgRb5szRgIAZ92AZQagp_M27wFAr4ehtXfUjA?rtime=Q5DNMiGw3kg", type: "planilha", icon: "fa-person-walking-dashed-line-arrow-right" }
                 ]
             },
             {
