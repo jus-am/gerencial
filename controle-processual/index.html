@@ -537,24 +537,44 @@ function handleRealtime(list, payload, mapFn, afterFn) {
 }
 
 async function persistIdoso(p) {
-    
-    try { await sb.from('processos_idosos').upsert(idosoToRow(p)); }
-    catch (e) { console.error('Supabase save error', e); showToast('Erro ao sincronizar', 'error'); }
+    try {
+        const {data, error} = await sb.from('processos_idosos').upsert(idosoToRow(p)).select('id');
+        if (error || !data || data.length !== 1) throw new Error('Operação não confirmada');
+        return true;
+    } catch (e) {
+        showToast('Operação não confirmada. Verifique a conexão e as permissões.', 'error');
+        return false;
+    }
 }
 async function persistCarta(c) {
-    
-    try { await sb.from('cartas_precatorias').upsert(cartaToRow(c)); }
-    catch (e) { console.error('Supabase save error', e); showToast('Erro ao sincronizar', 'error'); }
+    try {
+        const {data, error} = await sb.from('cartas_precatorias').upsert(cartaToRow(c)).select('id');
+        if (error || !data || data.length !== 1) throw new Error('Operação não confirmada');
+        return true;
+    } catch (e) {
+        showToast('Operação não confirmada. Verifique a conexão e as permissões.', 'error');
+        return false;
+    }
 }
 async function removeIdoso(id) {
-    
-    try { await sb.from('processos_idosos').delete().eq('id', id); }
-    catch (e) { console.error('Supabase delete error', e); }
+    try {
+        const {data, error} = await sb.from('processos_idosos').delete().eq('id', id).select('id');
+        if (error || !data || data.length !== 1) throw new Error('Operação não confirmada');
+        return true;
+    } catch (e) {
+        showToast('Operação não confirmada. Verifique a conexão e as permissões.', 'error');
+        return false;
+    }
 }
 async function removeCarta(id) {
-    
-    try { await sb.from('cartas_precatorias').delete().eq('id', id); }
-    catch (e) { console.error('Supabase delete error', e); }
+    try {
+        const {data, error} = await sb.from('cartas_precatorias').delete().eq('id', id).select('id');
+        if (error || !data || data.length !== 1) throw new Error('Operação não confirmada');
+        return true;
+    } catch (e) {
+        showToast('Operação não confirmada. Verifique a conexão e as permissões.', 'error');
+        return false;
+    }
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────
@@ -712,21 +732,21 @@ async function saveIdoso() {
         julgado: document.getElementById('pi-julgado').checked,
         pendencias: document.getElementById('pi-pendencias').value.trim(),
     };
+    if (!(await persistIdoso(p))) return;
     const idx = idosos.findIndex(x => x.id === id);
     if (idx >= 0) idosos[idx] = p; else idosos.push(p);
     closeModalIdoso();
     renderIdosos();
-    await persistIdoso(p);
     showToast('Processo salvo com sucesso');
 }
 async function deleteIdoso() {
     const id = Number(document.getElementById('pi-id').value);
     if (!id) return;
     if (!confirm('Excluir este processo do controle?')) return;
+    if (!(await removeIdoso(id))) return;
     idosos = idosos.filter(x => x.id !== id);
     closeModalIdoso();
     renderIdosos();
-    await removeIdoso(id);
     showToast('Processo excluído');
 }
 
@@ -846,21 +866,21 @@ async function saveCarta() {
         responsaveis,
         pendencias: document.getElementById('cp-pendencias').value.trim(),
     };
+    if (!(await persistCarta(c))) return;
     const idx = cartas.findIndex(x => x.id === id);
     if (idx >= 0) cartas[idx] = c; else cartas.push(c);
     closeModalCarta();
     renderCartas();
-    await persistCarta(c);
     showToast('Carta precatória salva com sucesso');
 }
 async function deleteCarta() {
     const id = Number(document.getElementById('cp-id').value);
     if (!id) return;
     if (!confirm('Excluir esta carta precatória do controle?')) return;
+    if (!(await removeCarta(id))) return;
     cartas = cartas.filter(x => x.id !== id);
     closeModalCarta();
     renderCartas();
-    await removeCarta(id);
     showToast('Carta precatória excluída');
 }
 </script>
