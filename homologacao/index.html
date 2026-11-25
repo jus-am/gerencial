@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <base href="../">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homologação - Central de Gestão</title>
+    
+    <!-- Ícone da aba do navegador (Favicon) -->
+    <link rel="icon" type="image/png" href="logo.png">
+
+    <!-- PWA: Adicionar à tela inicial (Android e iOS) -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a2a6c">
+
+    <!-- PWA: Suporte específico para iPhone/iPad (iOS) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Gerencial">
+    <link rel="apple-touch-icon" href="logo.png">
+    
+    <!-- Ícones da Font Awesome (Estilo Profissional) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Fonte Google Fonts (Inter - Moderna e Limpa) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ==========================================================================
+           Variáveis de Estilo (Design Tokens) - Facilita a manutenção de cores
+           ========================================================================== */
+        :root {
+            --primary-color: #1a2a6c;
+            --secondary-color: #b21f1f;
+            --bg-color: #f4f7f9;
+            --text-main: #2d3748;
+            --text-muted: #718096;
+            --card-bg: #ffffff;
+            --color-planilha: #27ae60; /* Revertido para o verde suave original */
+            --color-painel: #2980b9;
+            --color-sistema: #8e44ad;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+            --shadow-md: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* ==========================================================================
+           Reset e Base
+           ========================================================================== */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* ==========================================================================
+           Cabeçalho Institucional (Layout Clean e Compacto)
+           ========================================================================== */
+        .header {
+            position: relative;
+            background: var(--card-bg);
+            color: var(--text-main);
+            padding: 1.5rem 2rem;
+            border-radius: var(--radius);
+            text-align: center;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-sm);
+            border-top: 4px solid var(--primary-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-header {
+            max-height: 45px;
+            margin-bottom: 0.5rem;
+        }
+
+        .header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.2rem;
+            color: var(--primary-color);
+        }
+
+        .header p {
+            font-size: 0.95rem;
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        .unit-heading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+        }
+
+        .header .unit-name { font-weight: 600; }
+        .header .forum-details { margin-top: 0.4rem; }
+        .header .forum-details p { font-size: 0.8rem; overflow-wrap: anywhere; }
+        .forum-contacts a { color: var(--primary-color); }
+
+        .header-edit {
+            position: absolute;
+            top: 0.4rem;
+            right: 0.4rem;
+            display: grid;
+            place-items: center;
+            width: 2rem;
+            height: 2rem;
+            padding: 0;
+            border: 0;
+            border-radius: 0.4rem;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .header-edit:hover, .header-edit:focus-visible {
+            background: #eef2f7;
+            color: var(--primary-color);
+        }
+
+        .header-editor button {
+            font: inherit;
+            cursor: pointer;
+            border: 1px solid currentColor;
+            border-radius: 0.5rem;
+            background: var(--card-bg);
+            color: var(--primary-color);
+            padding: 0.4rem 0.65rem;
+        }
+
+        .header-editor {
+            width: min(30rem, calc(100% - 2rem));
+            max-height: calc(100% - 2rem);
+            margin: auto;
+            padding: 1.25rem;
+            border: 0;
+            border-radius: var(--radius);
+            color: var(--text-main);
+            background: var(--card-bg);
+        }
+
+        .header-editor::backdrop { background: rgb(15 23 42 / 55%); }
+        .header-editor form, .header-editor label { display: grid; gap: 0.4rem; }
+        .header-editor form { gap: 0.75rem; }
+        .header-editor input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #94a3b8;
+            border-radius: 0.4rem;
+            font: inherit;
+        }
+        .header-editor-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+        /* ==========================================================================
+           Seções e Grid
+           ========================================================================== */
+        .section-title {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 1.5rem 0 1rem 0; 
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* ==========================================================================
+           Cards (Material Design style)
+           ========================================================================== */
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 1.8rem 1.5rem;
+            text-align: center;
+            text-decoration: none;
+            color: var(--text-main);
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            border: 1px solid #edf2f7;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: var(--text-muted);
+            transition: var(--transition);
+        }
+
+        .card.planilha::before { background: var(--color-planilha); }
+        .card.painel::before { background: var(--color-painel); }
+        .card.sistema::before { background: var(--color-sistema); }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-md);
+            border-color: transparent;
+        }
+
+        .card:hover::before {
+            height: 6px;
+        }
+
+        .icon-wrapper {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: #f7fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+            font-size: 1.8rem;
+            transition: var(--transition);
+        }
+
+        .card.planilha .icon-wrapper { color: var(--color-planilha); background: #e8f5e9; } /* Fundo verde clarinho original */
+        .card.painel .icon-wrapper { color: var(--color-painel); background: #e3f2fd; }
+        .card.sistema .icon-wrapper { color: var(--color-sistema); background: #f3e5f5; }
+
+        .card:hover .icon-wrapper {
+            transform: scale(1.1);
+        }
+
+        .card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .card p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* ==========================================================================
+           Acesso Rápido (Quick Access)
+           ========================================================================== */
+        .quick-access-container {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: -0.5rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .quick-btn {
+            background: var(--card-bg);
+            color: var(--primary-color);
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid #edf2f7;
+            transition: var(--transition);
+        }
+
+        .quick-btn i {
+            font-size: 1.1rem;
+        }
+
+        .quick-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* ==========================================================================
+           Responsividade (Ajustada para o Celular)
+           ========================================================================== */
+        @media (max-width: 768px) {
+            body { padding: 1rem; }
+            .header { padding: 1.5rem 1rem; margin-bottom: 1.5rem; }
+            .header h1 { font-size: 1.4rem; }
+            
+            .grid-container { 
+                grid-template-columns: repeat(2, 1fr); 
+                gap: 0.75rem; 
+            }
+            
+            .card { padding: 1.2rem 0.8rem; }
+            .icon-wrapper { width: 45px; height: 45px; font-size: 1.4rem; margin-bottom: 0.8rem; }
+            .card h3 { font-size: 0.9rem; margin-bottom: 0.3rem; }
+            .card p { font-size: 0.75rem; }
+
+            .quick-btn { font-size: 0.85rem; padding: 0.6rem 1.2rem; }
+            .section-title { font-size: 1.2rem; margin: 1.2rem 0 1rem 0; }
+        }
+        /* Ajustes de densidade e acessibilidade da página inicial */
+        body { padding: 1.25rem; max-width: 1600px; }
+        .header { padding: 1rem 1.5rem; margin-bottom: 1.25rem; }
+        .quick-access-container { gap: .6rem; margin-bottom: 1.25rem; }
+        .quick-btn { padding: .6rem 1rem; }
+        .section-title { font-size: 1.2rem; margin: 1.1rem 0 .7rem; }
+        .grid-container { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: .85rem; margin-bottom: 1rem; }
+        .card { padding: 1rem .8rem; }
+        .icon-wrapper { width: 46px; height: 46px; font-size: 1.4rem; margin-bottom: .55rem; }
+        .card h3 { font-size: .98rem; margin-bottom: .25rem; }
+        .card p { font-size: .8rem; color: #526174; }
+        a:focus-visible, button:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+        @media (max-width: 480px) {
+            body { padding: .65rem; }
+            .grid-container { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+            .quick-btn { padding: .55rem .75rem; }
+            .card { overflow-wrap: anywhere; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition: none !important; }
+            .card:hover, .quick-btn:hover, .card:hover .icon-wrapper { transform: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <img src="logo.png" alt="TJAM" class="logo-header" onerror="this.style.display='none'">
+        <h1>CENTRAL DE GESTÃO</h1>
+        <div class="unit-heading">
+            <p class="unit-name" id="unit-name">Vara Única da Comarca de Benjamin Constant</p>
+            <button class="header-edit" id="edit-unit" type="button" aria-label="Editar dados da unidade" title="Editar dados da unidade">
+                <i class="fas fa-pen" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="forum-details">
+            <p id="forum-name">Fórum Azarias Menescal de Vasconcelos</p>
+            <p id="forum-address">Avenida Castelo Branco, 469 – Centro, Benjamin Constant – AM</p>
+            <p class="forum-contacts" id="forum-contacts">
+                <a id="forum-phone" href="tel:+559221296809">(92) 2129-6809</a>
+                <span id="forum-contact-separator" aria-hidden="true"> · </span>
+                <a id="forum-email" href="mailto:comarca.bconstant@tjam.jus.br">comarca.bconstant@tjam.jus.br</a>
+            </p>
+        </div>
+    </header>
+
+    <dialog class="header-editor" id="unit-editor" aria-labelledby="unit-editor-title">
+        <form id="unit-form">
+            <h2 id="unit-editor-title">Editar dados da unidade</h2>
+            <label>Nome da unidade<input name="unit-name" maxlength="160" required autofocus></label>
+            <label>Nome do fórum<input name="forum-name" maxlength="160"></label>
+            <label>Endereço<input name="forum-address" maxlength="240"></label>
+            <label>Telefone<input name="forum-phone" type="tel" maxlength="40"></label>
+            <label>E-mail<input name="forum-email" type="email" maxlength="160"></label>
+            <p role="alert" id="unit-editor-error" hidden></p>
+            <div class="header-editor-actions">
+                <button id="cancel-unit-edit" type="button">Cancelar</button>
+                <button type="submit">Salvar</button>
+            </div>
+        </form>
+    </dialog>
+
+    <!-- Barra de Acesso Rápido -->
+    <nav class="quick-access-container">
+        <a href="https://projudi.tjam.jus.br/projudi/" target="_blank" rel="noopener noreferrer" class="quick-btn">
+            <i class="fas fa-laptop-code"></i> PROJUDI
+        </a>
+         <a href="https://mail.google.com/mail/u/0/?tab=rm&ogbl#inbox" target="_blank" rel="noopener noreferrer" class="quick-btn">
+            <i class="fas fa-envelope"></i> E-mail
+        </a>
+        <a href="https://malotedigital.tjam.jus.br/" target="_blank" rel="noopener noreferrer" class="quick-btn">
+            <i class="fas fa-envelopes-bulk"></i> Malote Digital
+        </a>
+        <a href="https://sei.tjam.jus.br/sip/login.php?sigla_orgao_sistema=TJAM&amp;sigla_sistema=SEI" target="_blank" rel="noopener noreferrer" class="quick-btn">
+            <i class="fas fa-file-alt" aria-hidden="true"></i> SEI
+        </a>
+        <a href="https://www.jus.br/" target="_blank" rel="noopener noreferrer" class="quick-btn">
+            <i class="fas fa-server"></i> JUS BR
+        </a>
+        <a href="https://corregedoria.pje.jus.br/" target="_blank" rel="noopener noreferrer" class="quick-btn">
+            <i class="fas fa-magnifying-glass"></i> PJeCOR
+        </a>
+        <a href="https://helpdesk.tjam.jus.br/" target="_blank" rel="noopener noreferrer" class="quick-btn">
+            <i class="fas fa-headset"></i> Helpdesk
+        </a>
+    </nav>
+
+    <!-- O conteúdo será gerado dinamicamente pelo JavaScript aqui -->
+    <p style="text-align:center;margin:0 0 1rem;color:#795300;font-weight:600">VERSÃO DE HOMOLOGAÇÃO — prévia visual</p>
+    <main id="dashboard-content"></main>
+
+    <script>
+        const dashboardData = [
+            {
+                sectionId: "aplicativos",
+                sectionTitle: "Aplicativos Gerenciais",
+                sectionIcon: "fa-folder-open",
+                items: [
+                    { title: "Réus Presos", desc: "Sistema Interno de Controle de Réus Presos", link: "https://controle-reus-tjam.web.app/", type: "planilha", icon: "fa-handcuffs" },
+                    { title: "Diário de Secretaria", desc: "Uso exclusivo do Diretor de Secretaria", link: "https://diario-secretaria-v2.web.app/", type: "planilha", icon: "fa-book-open" },
+                    { title: "Cálculo de Suspensão e Prescrição", desc: "Ferramenta de cálculo / Pena Abstrata", link: "https://7vcriminal.github.io/calculadora-prescricao/", type: "planilha", icon: "fa-calculator" },
+                    { title: "Sistema de Resumo AIJ", desc: "Assistente de Resumo Processual para Audiências", link: "https://resumo-processual-aij.web.app/", type: "planilha", icon: "fa-wand-magic-sparkles" },
+                    { title: "Audiências", desc: "Pauta e controle de audiências", link: "./audiencias/", type: "planilha", icon: "fa-calendar-days" },
+                    { title: "Controle Processual", desc: "Processos Idosos e Cartas Precatórias", link: "./controle-processual/", type: "planilha", icon: "fa-scale-balanced" }
+                ]
+            },
+            {
+                sectionId: "bi",
+                sectionTitle: "Metas CNJ e Indicadores Oficiais (BI)",
+                sectionIcon: "fa-chart-pie",
+                items: [
+                    { title: "Metas CNJ", desc: "Painel de Metas Nacionais do CNJ", link: "https://metas.tjam.jus.br/index.xhtml", type: "painel", icon: "fa-landmark" },
+                    { title: "IAD e TCL", desc: "Painel BI de IAD e TCL", link: "https://app.powerbi.com/view?r=eyJrIjoiYzA2ODJkM2YtNzM3OS00MTdmLTgyMzItNmUwMmEyM2EwMGE1IiwidCI6IjcyNzEwODAyLTlhMzMtNGQyZC1hMDU1LTMzZDMxY2I0N2Q2MSJ9", type: "painel", icon: "fa-temperature-half" },
+                    { title: "Tempo Ações Penais", desc: "Painel BI Tempo de Ações Penais", link: "https://app.powerbi.com/view?r=eyJrIjoiYWI5ODZlZDAtOGE5NS00ZGMzLThkZmUtZWZiYzYzZDAwNzAzIiwidCI6IjcyNzEwODAyLTlhMzMtNGQyZC1hMDU1LTMzZDMxY2I0N2Q2MSJ9", type: "painel", icon: "fa-stopwatch" },
+                    { title: "Paralisados", desc: "Painel BI de Processos Paralisados", link: "https://app.powerbi.com/view?r=eyJrIjoiNmQ2NTUzYzQtZmM3Mi00NDYxLTkyZTYtYmUzNjZjMDcwOTgxIiwidCI6IjcyNzEwODAyLTlhMzMtNGQyZC1hMDU1LTMzZDMxY2I0N2Q2MSJ9", type: "painel", icon: "fa-triangle-exclamation" },
+                    { title: "Gerencial", desc: "Painel BI Gerencial da Unidade", link: "https://app.powerbi.com/view?r=eyJrIjoiNmQ2NTUzYzQtZmM3Mi00NDYxLTkyZTYtYmUzNjZjMDcwOTgxIiwidCI6IjcyNzEwODAyLTlhMzMtNGQyZC1hMDU1LTMzZDMxY2I0N2Q2MSJ9", type: "painel", icon: "fa-gears" },
+                    { title: "Estratégico CGJ", desc: "Painel BI Estratégico da CGJ", link: "https://app.powerbi.com/view?r=eyJrIjoiN2VjMTZmYzAtNzhjYy00N2ZkLTlkOTMtMGI5MmYwODJkNzA4IiwidCI6IjcyNzEwODAyLTlhMzMtNGQyZC1hMDU1LTMzZDMxY2I0N2Q2MSJ9", type: "painel", icon: "fa-chart-line" },
+                    { title: "Baixa/Arquivamento", desc: "Painel BI de Baixa", link: "https://app.powerbi.com/view?r=eyJrIjoiN2VjMTZmYzAtNzhjYy00N2ZkLTlkOTMtMGI5MmYwODJkNzA4IiwidCI6IjcyNzEwODAyLTlhMzMtNGQyZC1hMDU1LTMzZDMxY2I0N2Q2MSJ9", type: "painel", icon: "fa-box-archive" },
+                    { title: "Painéis BIs", desc: "Painel BI Completo", link: "https://app.powerbi.com/view?r=eyJrIjoiOGM0MGQ1NjctYWQ5Yy00N2EzLThlN2QtZWRhY2FjYmZkNDQ2IiwidCI6IjcyNzEwODAyLTlhMzMtNGQyZC1hMDU1LTMzZDMxY2I0N2Q2MSJ9", type: "painel", icon: "fa-chart-column" }
+                ]
+            },
+            {
+                sectionId: "planilhas",
+                sectionTitle: "Planilhas e Controles Auxiliares",
+                sectionIcon: "fa-file-excel",
+                items: [
+                    { title: "Acervo sem Sentença", desc: "Processos da Meta 1 sem Julgamento", link: "https://docs.google.com/spreadsheets/d/12OBexxe-2ygvTBzXJIBTN1ftnc3_rnWxlFV3CDQLTKY/edit", type: "planilha", icon: "fa-gavel" },
+                    { title: "Tempo APN", desc: "Processos por tempo de tramitação", link: "#", type: "planilha", icon: "fa-hourglass-half" },
+                    { title: "Suspensões e Prescrições", desc: "Controle de Suspensões e Prescrições", link: "https://docs.google.com/spreadsheets/d/12BY4Izw3QiIFQy2iAAypzaae6hgkq5UPBqkLbFHfMuE/edit", type: "planilha", icon: "fa-file-signature" },
+                    { title: "Presos SEAP", desc: "Listagem de Presos da SEAP", link: "https://office365prodam-my.sharepoint.com/:x:/g/personal/estatistica_cosipe_seap_am_gov_br/IQAUJqweRhZgRb5szRgIAZ92AZQagp_M27wFAr4ehtXfUjA?rtime=Q5DNMiGw3kg", type: "planilha", icon: "fa-person-walking-dashed-line-arrow-right" }
+                ]
+            },
+            {
+                sectionId: "sistemas",
+                sectionTitle: "Sistemas e Sites Úteis",
+                sectionIcon: "fa-globe",
+                items: [
+                    { title: "PROJUDI", desc: "Processo Eletrônico do Amazonas", link: "https://projudi.tjam.jus.br/projudi/", type: "sistema", icon: "fa-laptop-code" },
+                    { title: "JUS BR", desc: "BNMP / SEEU / SISBAJUD", link: "https://www.jus.br/", type: "sistema", icon: "fa-server" },
+                    { title: "PJeCOR", desc: "Sistema Processual da CGJ", link: "https://corregedoria.pje.jus.br/", type: "sistema", icon: "fa-magnifying-glass" },
+                    { title: "Malote Digital", desc: "Envio e Recebimento de Docs", link: "https://malotedigital.tjam.jus.br/", type: "sistema", icon: "fa-envelopes-bulk" },
+                    { title: "Site TJAM", desc: "Portal do TJAM", link: "https://www.tjam.jus.br/", type: "sistema", icon: "fa-building-columns" },
+                    { title: "INTRANET", desc: "Uso em rede do TJAM", link: "https://intranet.tjam.jus.br/", type: "sistema", icon: "fa-network-wired" },
+                    { title: "HELPDESK", desc: "Chamados TI", link: "https://helpdesk.tjam.jus.br/", type: "sistema", icon: "fa-headset" }
+                ]
+            }
+        ];
+
+        function renderDashboard() {
+            const container = document.getElementById('dashboard-content');
+            let htmlContent = '';
+
+            dashboardData.forEach(section => {
+                htmlContent += `
+                    <h2 class="section-title">
+                        <i class="fas ${section.sectionIcon}"></i> ${section.sectionTitle}
+                    </h2>
+                    <div class="grid-container">
+                `;
+
+                section.items.forEach(item => {
+                    htmlContent += `
+                        <a href="${item.link}" target="_blank" rel="noopener noreferrer" class="card ${item.type}">
+                            <div class="icon-wrapper">
+                                <i class="fas ${item.icon}"></i>
+                            </div>
+                            <h3>${item.title}</h3>
+                            <p>${item.desc}</p>
+                        </a>
+                    `;
+                });
+
+                htmlContent += `</div>`; 
+            });
+
+            container.innerHTML = htmlContent;
+        }
+
+        function initUnitEditor() {
+            const storageKey = 'gerencial.unit-header.v1';
+            const dialog = document.getElementById('unit-editor');
+            const form = document.getElementById('unit-form');
+            const error = document.getElementById('unit-editor-error');
+            const fields = Object.fromEntries(
+                Array.from(form.elements).filter(input => input.name)
+                    .map(input => [input.name, document.getElementById(input.name)])
+            );
+            const defaults = Object.fromEntries(
+                Object.entries(fields).map(([name, element]) => [name, element.textContent.trim()])
+            );
+
+            function renderDetails(details) {
+                for (const [name, element] of Object.entries(fields)) {
+                    const value = typeof details[name] === 'string' ? details[name].trim() : defaults[name];
+                    element.textContent = name === 'unit-name' ? value || defaults[name] : value;
+                    element.hidden = name !== 'unit-name' && !value;
+                }
+
+                const phone = fields['forum-phone'];
+                const email = fields['forum-email'];
+                const digits = phone.textContent.replace(/\D/g, '');
+                if (digits) {
+                    phone.href = `tel:+${digits.length === 10 || digits.length === 11 ? '55' : ''}${digits}`;
+                } else {
+                    phone.removeAttribute('href');
+                }
+                if (email.textContent) email.href = `mailto:${encodeURIComponent(email.textContent).replace('%40', '@')}`;
+                else email.removeAttribute('href');
+                document.getElementById('forum-contact-separator').hidden = phone.hidden || email.hidden;
+                document.getElementById('forum-contacts').hidden = phone.hidden && email.hidden;
+            }
+
+            try {
+                renderDetails(JSON.parse(localStorage.getItem(storageKey)) || defaults);
+            } catch {
+                renderDetails(defaults);
+            }
+
+            document.getElementById('edit-unit').addEventListener('click', () => {
+                for (const [name, element] of Object.entries(fields)) {
+                    form.elements.namedItem(name).value = element.textContent;
+                }
+                error.hidden = true;
+                dialog.showModal();
+            });
+            document.getElementById('cancel-unit-edit').addEventListener('click', () => dialog.close());
+
+            form.addEventListener('submit', event => {
+                event.preventDefault();
+                const details = Object.fromEntries(
+                    Array.from(new FormData(form), ([name, value]) => [name, value.trim()])
+                );
+                if (!details['unit-name']) {
+                    error.textContent = 'Informe o nome da unidade.';
+                    error.hidden = false;
+                    form.elements.namedItem('unit-name').focus();
+                    return;
+                }
+                try {
+                    localStorage.setItem(storageKey, JSON.stringify(details));
+                } catch {
+                    error.textContent = 'O navegador não permitiu salvar os dados.';
+                    error.hidden = false;
+                    return;
+                }
+                renderDetails(details);
+                dialog.close();
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', renderDashboard);
+        document.addEventListener('DOMContentLoaded', initUnitEditor);
+    </script>
+</body>
+</html>
