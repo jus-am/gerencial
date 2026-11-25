@@ -57,14 +57,19 @@ jobs:
               assert.ok(!signup.ok,'Autocadastro precisa estar bloqueado');
               console.log('OK: autocadastro bloqueado');
               const [writer, reader, denied] = await Promise.all([createIdentity('servidor'),createIdentity('consulta'),createIdentity('sem-acesso')]);
+              fs.writeFileSync(require('node:path').join(process.env.RUNNER_TEMP,'gerencial-browser-identity.json'),
+                  JSON.stringify(writer.credentials),{mode:0o600});
               const sql = `begin;
+              insert into public.membros_mural values ('${writer.id}','diretor');
               insert into public.perfis_usuarios values
                 ('${writer.id}','audiencias','Servidor fictício','servidor',true),
-                ('${reader.id}','audiencias','Consulta fictícia','consulta',true);
+                ('${reader.id}','audiencias','Consulta fictícia','consulta',true),
+                ('${writer.id}','controle_processual','Servidor fictício','servidor',true);
               insert into public.permissoes_usuarios values
                 ('${writer.id}','audiencias','select'),('${writer.id}','audiencias','insert'),
                 ('${writer.id}','audiencias','update'),('${writer.id}','audiencias','delete'),
-                ('${reader.id}','audiencias','select'),('${reader.id}','audiencias','update');
+                ('${reader.id}','audiencias','select'),('${reader.id}','audiencias','update'),
+                ('${writer.id}','controle_processual','select'),('${writer.id}','controle_processual','insert');
               commit;`;
               execFileSync('docker',['exec','-i','supabase_db_gerencial-2-homologacao-local','psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1'],
                   {input:sql,stdio:['pipe','ignore','ignore']});
@@ -93,3 +98,18 @@ jobs:
               console.log('OK: renovação de sessão');
           })().catch(error=>{console.error(error.message);process.exitCode=1});
           NODE
+      - name: Abrir os três aplicativos no navegador
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/gerencial-browser" --no-save --no-package-lock playwright@1.55.0
+          "$RUNNER_TEMP/gerencial-browser/node_modules/.bin/playwright" install chromium
+          node - "$RUNNER_TEMP/gerencial-supabase.json" <<'NODE'
+          const fs = require('node:fs');
+          const { PUBLISHABLE_KEY } = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          fs.writeFileSync('seguranca/config.local.js', 'window.GERENCIAL_HOMOLOGACAO = ' +
+              JSON.stringify({url:'http://127.0.0.1:54321',publishableKey:PUBLISHABLE_KEY})+';');
+          NODE
+          node seguranca/servir-local.cjs &
+          trap 'kill $! 2>/dev/null || true' EXIT
+          curl --retry 5 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8080/ -o /dev/null
+          node seguranca/verificar-integracao-browser.cjs
