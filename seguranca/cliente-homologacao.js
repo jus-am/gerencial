@@ -9,7 +9,10 @@
             localHosts.includes(endpoint.hostname) && ['http:', 'https:'].includes(endpoint.protocol);
         const isCodespace = endpoint.protocol === 'https:' && endpoint.origin === location.origin &&
             /^[a-z0-9-]+-8080\.app\.github\.dev$/.test(endpoint.hostname);
-        if ((!isLocal && !isCodespace) ||
+        const isProduction = location.origin === 'https://jus-am.github.io' &&
+            location.pathname.startsWith('/gerencial/') &&
+            endpoint.origin === 'https://qcvietuczbysditpkopr.supabase.co';
+        if ((!isLocal && !isCodespace && !isProduction) ||
             endpoint.href !== endpoint.origin + '/' ||
             typeof config?.publishableKey !== 'string' ||
             !/^sb_publishable_[\w-]+$/.test(config.publishableKey)) {
