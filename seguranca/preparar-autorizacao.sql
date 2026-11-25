@@ -1,10 +1,10 @@
 -- PROPOSTA NÃO EXECUTADA. Aplicar somente após backup, classificação e homologação.
 begin;
-do $ begin
+do $$ begin
     if current_setting('gerencial.liberacao_producao', true) is distinct from 'confirmada' then
         raise exception 'Mudança bloqueada: confirme o backup, a restauração e a janela de produção';
     end if;
-end $;
+end $$;
 create table public.perfis_usuarios (
  user_id uuid references auth.users(id) on delete cascade,
  aplicativo text not null check(aplicativo in ('audiencias','controle_processual','tempo_apn')),
