@@ -19,14 +19,15 @@ create policy perfil_proprio on public.perfis_usuarios for select to authenticat
 create policy permissoes_proprias on public.permissoes_usuarios for select to authenticated using(user_id=(select auth.uid()));
 insert into public.perfis_usuarios(user_id,nome,perfil,ativo)
 select user_id,'Diretor de Secretaria','administrador',true from public.membros_mural where papel='diretor';
--- Nenhum outro usuário recebe acesso automaticamente.
+-- Nenhum usuário, inclusive o diretor do mural, recebe acesso automático aos aplicativos.
+-- Autorizações de cada aplicativo deverão ser provisionadas separadamente antes da troca de políticas.
 create schema if not exists gerencial_privado;
 revoke all on schema gerencial_privado from public,anon,authenticated;
 grant usage on schema gerencial_privado to authenticated;
 create function gerencial_privado.autorizado(app text,op text) returns boolean
 language sql stable security invoker set search_path='' as $$
 select exists(select 1 from public.perfis_usuarios p where p.user_id=(select auth.uid()) and p.ativo and
-(p.perfil='administrador' or ((p.perfil='servidor' or (p.perfil='consulta' and op='select')) and exists(select 1 from public.permissoes_usuarios a where a.user_id=p.user_id and a.aplicativo=app and a.operacao=op))))
+(((p.perfil in ('administrador','servidor') or (p.perfil='consulta' and op='select')) and exists(select 1 from public.permissoes_usuarios a where a.user_id=p.user_id and a.aplicativo=app and a.operacao=op))))
 $$;
 revoke all on function gerencial_privado.autorizado(text,text) from public,anon,authenticated;
 grant execute on function gerencial_privado.autorizado(text,text) to authenticated;
